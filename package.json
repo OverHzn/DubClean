@@ -40,10 +40,12 @@
           "arch": ["x64"]
         }
       ],
+      "icon": "build/icon.ico",
       "signAndEditExecutable": false
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "build/icon.png"
     }
   }
 }

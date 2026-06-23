@@ -4,6 +4,8 @@ Desktop app (Electron) untuk membersihkan video hasil translate/repost — blur 
 
 **Repo:** https://github.com/OverHzn/DubClean
 
+![DubClean screenshot](docs/images/screenshot.jpg)
+
 ---
 
 ## Fitur
@@ -90,6 +92,8 @@ build-app.bat
 | `dist\DubClean 1.0.0.exe` | Portable, tanpa install |
 | `dist\win-unpacked\DubClean.exe` | Versi unpacked |
 
+Installer memakai custom icon dari `build/icon.ico` (bukan icon Electron default).
+
 Linux:
 
 ```bash
@@ -104,6 +108,11 @@ npm run build:linux    # AppImage
 
 ```
 DubClean/
+├── build/
+│   ├── icon.ico       # Windows app icon (installer + taskbar)
+│   └── icon.png       # Linux AppImage icon
+├── docs/
+│   └── images/        # screenshot untuk README
 ├── src/
 │   ├── main.js        # Electron main, IPC, ffmpeg render, ASS generator
 │   ├── preload.js     # contextBridge API
