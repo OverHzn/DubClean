@@ -1,0 +1,8 @@
+node_modules/
+dist/
+output/*.mp4
+output/*.mov
+output/*.mkv
+*.log
+.DS_Store
+Thumbs.db
