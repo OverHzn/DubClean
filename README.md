@@ -24,9 +24,11 @@ Buka video → gambar blur box → import SRT → atur style → (opsional) audi
 ### Pipeline dengan SublyAI
 
 ```
-SublyAI  →  generate SRT terjemahan ID
-DubClean →  blur watermark + burn subtitle styled + add/replace audio → upload
+SublyAI  →  transcribe + translate → download subtitle_id.srt
+DubClean →  blur watermark + burn subtitle styled + add/replace audio → {nama}_clean.mp4
 ```
+
+Generate SRT di [SublyAI](https://github.com/OverHzn/sublyai) (`outputs/<job_id>/subtitle_id.srt`), lalu import ke DubClean untuk finishing.
 
 ---
 
