@@ -252,6 +252,15 @@ function hitTest(mx, my) {
 
 // ── Canvas events ────────────────────────────────────────────────
 
+function endBoxInteraction() {
+  const needsSync = isDragging || isResizing;
+  isDragging = false;
+  isResizing = false;
+  resizeHandle = null;
+  boxAtDragStart = null;
+  if (needsSync) renderBlurList();
+}
+
 canvas.addEventListener('mousedown', (e) => {
   if (!videoMeta) return;
   const rect = canvas.getBoundingClientRect();
@@ -314,7 +323,6 @@ canvas.addEventListener('mousemove', (e) => {
       region.x = Math.min(region.x, videoMeta.width - region.width);
       region.y = Math.min(region.y, videoMeta.height - region.height);
     }
-    renderBlurList();
     drawCanvas();
     return;
   }
@@ -340,7 +348,6 @@ canvas.addEventListener('mousemove', (e) => {
     region.y = Math.max(0, y);
     region.width = width;
     region.height = height;
-    renderBlurList();
     drawCanvas();
   }
 });
@@ -375,19 +382,16 @@ canvas.addEventListener('mouseup', (e) => {
     return;
   }
 
-  isDragging = false;
-  isResizing = false;
-  resizeHandle = null;
-  boxAtDragStart = null;
+  endBoxInteraction();
 });
 
 window.addEventListener('mouseup', () => {
   if (isDrawing) {
     isDrawing = false;
     drawCanvas();
+    return;
   }
-  isDragging = false;
-  isResizing = false;
+  endBoxInteraction();
 });
 
 // ── Blur list UI ─────────────────────────────────────────────────
@@ -528,7 +532,6 @@ async function loadVideo(path) {
     return;
   }
 
-  video.addEventListener('loadedmetadata', onVideoResize, { once: false });
   if (video.readyState >= 1) onVideoResize();
 }
 
@@ -718,6 +721,8 @@ document.getElementById('btnRender').addEventListener('click', async () => {
 });
 
 // ── Init ─────────────────────────────────────────────────────────
+
+video.addEventListener('loadedmetadata', onVideoResize);
 
 outputFolder = null;
 initTabs();
