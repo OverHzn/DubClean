@@ -216,6 +216,7 @@ body {
   border-radius: var(--radius-lg);
   overflow: hidden;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 280px;
@@ -225,6 +226,7 @@ body {
 }
 
 .player-wrapper.has-video {
+  justify-content: flex-start;
   border-color: var(--border-strong);
 }
 
@@ -243,9 +245,12 @@ body {
 
 .player-stage {
   position: relative;
-  flex-shrink: 0;
+  flex: 1;
+  flex-shrink: 1;
+  min-height: 0;
   background: #000;
   overflow: hidden;
+  align-self: center;
 }
 
 .player-wrapper.has-video .player-stage {
@@ -265,6 +270,11 @@ body {
   inset: 0;
   width: 100%;
   height: 100%;
+  cursor: default;
+  pointer-events: none;
+}
+
+#overlayCanvas.edit-mode {
   cursor: crosshair;
   pointer-events: auto;
 }
@@ -384,6 +394,120 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateX(-50%) translateY(6px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Transport bar ─────────────────────────────────────────── */
+
+.transport-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.transport-bar.hidden {
+  display: none;
+}
+
+.btn-transport {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition), background var(--transition);
+  flex-shrink: 0;
+}
+
+.btn-transport svg {
+  width: 16px;
+  height: 16px;
+}
+
+.play-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  user-select: none;
+  cursor: default;
+}
+
+.play-status svg {
+  width: 14px;
+  height: 14px;
+}
+
+.play-status-key {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--surface-active);
+  border: 1px solid var(--border);
+}
+
+.btn-transport:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.btn-edit-mode.active {
+  color: var(--accent-light);
+  border-color: rgba(124, 108, 240, 0.4);
+  background: rgba(124, 108, 240, 0.12);
+}
+
+.transport-time {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  min-width: 42px;
+  flex-shrink: 0;
+}
+
+.transport-seek {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--surface-active);
+  border-radius: 99px;
+  cursor: pointer;
+}
+
+.transport-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.player-wrapper:fullscreen .transport-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: rgba(8, 8, 12, 0.92);
 }
 
 /* ── Sidebar tabs ──────────────────────────────────────────── */

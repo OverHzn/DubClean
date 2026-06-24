@@ -2,14 +2,32 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { spawn } = require('child_process');
+const { pathToFileURL } = require('url');
 
 // Simpan cache/userData di luar OneDrive — hindari EBUSY & "Access denied" di folder sync
 app.setPath('userData', path.join(os.homedir(), 'AppData', 'Local', 'DubClean'));
 const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('ffmpeg-static');
 const { parseSrt } = require('./srtParser');
 
-ffmpeg.setFfmpegPath(ffmpegPath);
+function resolveBundledBinary(binaryPath) {
+  if (!binaryPath) return null;
+  if (binaryPath.includes('app.asar')) {
+    return binaryPath.replace('app.asar', 'app.asar.unpacked');
+  }
+  return binaryPath;
+}
+
+const ffmpegPath = resolveBundledBinary(require('ffmpeg-static'));
+if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
+  console.error('ffmpeg binary tidak ditemukan:', ffmpegPath);
+} else {
+  ffmpeg.setFfmpegPath(ffmpegPath);
+}
+
+function getDefaultOutputDir() {
+  return path.join(app.getPath('documents'), 'DubClean', 'output');
+}
 
 let mainWindow = null;
 
@@ -86,7 +104,7 @@ ipcMain.handle('dialog:chooseOutputFolder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Pilih Folder Output',
     properties: ['openDirectory', 'createDirectory'],
-    defaultPath: path.join(app.getAppPath(), 'output'),
+    defaultPath: getDefaultOutputDir(),
   });
   if (result.canceled || !result.filePaths.length) return null;
   return result.filePaths[0];
@@ -119,23 +137,56 @@ ipcMain.handle('dialog:loadPreset', async () => {
 
 ipcMain.handle('srt:parse', (_event, content) => parseSrt(content));
 
-// ── Video metadata ───────────────────────────────────────────────
+// ── Video metadata & preview src ─────────────────────────────────
 
-ipcMain.handle('video:getMeta', (_event, videoPath) => {
+function probeVideoMeta(videoPath) {
   return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(videoPath, (err, metadata) => {
-      if (err) return reject(err.message || String(err));
-      const videoStream = metadata.streams.find((s) => s.codec_type === 'video');
-      const hasAudio = metadata.streams.some((s) => s.codec_type === 'audio');
+    if (!ffmpegPath) {
+      return reject(new Error('ffmpeg tidak tersedia — coba install ulang aplikasi'));
+    }
+
+    const proc = spawn(ffmpegPath, ['-hide_banner', '-i', videoPath], { windowsHide: true });
+    let stderr = '';
+
+    proc.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    proc.on('error', (err) => reject(err.message || String(err)));
+
+    proc.on('close', () => {
+      const dimMatch =
+        stderr.match(/yuv\d+p(?:\([^)]*\))?,\s*(\d{2,5})x(\d{2,5})/) ||
+        stderr.match(/Stream #\d+:\d+[^\n]*?(\d{2,5})x(\d{2,5})/);
+      const durMatch = stderr.match(/Duration:\s*(\d+):(\d+):(\d+)[.,](\d+)/);
+      const hasAudio = /Audio:/.test(stderr);
+
+      if (!dimMatch && !durMatch) {
+        return reject(new Error('Gagal membaca metadata video'));
+      }
+
+      let duration = 0;
+      if (durMatch) {
+        duration =
+          parseInt(durMatch[1], 10) * 3600 +
+          parseInt(durMatch[2], 10) * 60 +
+          parseInt(durMatch[3], 10) +
+          parseInt(durMatch[4], 10) / 100;
+      }
+
       resolve({
-        width: videoStream?.width || 0,
-        height: videoStream?.height || 0,
-        duration: metadata.format?.duration || 0,
+        width: dimMatch ? parseInt(dimMatch[1], 10) : 0,
+        height: dimMatch ? parseInt(dimMatch[2], 10) : 0,
+        duration,
         hasAudio,
       });
     });
   });
-});
+}
+
+ipcMain.handle('video:getMeta', (_event, videoPath) => probeVideoMeta(videoPath));
+
+ipcMain.handle('video:getSrc', (_event, videoPath) => pathToFileURL(videoPath).href);
 
 // ── ASS generator ────────────────────────────────────────────────
 
@@ -224,12 +275,12 @@ function buildBlurChain(blurRegions) {
   blurRegions.forEach((region, i) => {
     const { x, y, width, height, blur_intensity, time_range } = region;
     const intensity = Math.max(1, blur_intensity || 20);
-    const ratio = Math.max(1, Math.round(intensity / 2));
+    const sigma = Math.max(1, Math.round(intensity / 3));
     const blurLabel = `blur${i}`;
     const outLabel = `v${i}`;
 
     parts.push(
-      `[${current}]crop=${width}:${height}:${x}:${y},boxblur=${intensity}:${ratio}[${blurLabel}]`
+      `[${current}]crop=${width}:${height}:${x}:${y},gblur=sigma=${sigma}:steps=1[${blurLabel}]`
     );
 
     let overlay = `[${current}][${blurLabel}]overlay=${x}:${y}`;
@@ -247,7 +298,10 @@ function buildBlurChain(blurRegions) {
 }
 
 function escapeFfmpegPath(filePath) {
-  return filePath.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'");
+  return filePath
+    .replace(/\\/g, '/')
+    .replace(/^([a-zA-Z]):/, '$1\\:')
+    .replace(/'/g, "'\\''");
 }
 
 function buildFullFilter(blurRegions, assPath, hasCues) {
@@ -260,9 +314,6 @@ function buildFullFilter(blurRegions, assPath, hasCues) {
   if (hasCues) {
     const subPart = `[${lastLabel}]subtitles='${escapedAss}'[outv]`;
     chain = chain ? `${chain};${subPart}` : subPart;
-    videoOut = 'outv';
-  } else if (blurFilter) {
-    chain = `${chain};[${lastLabel}]null[outv]`;
     videoOut = 'outv';
   }
 
@@ -283,7 +334,11 @@ ipcMain.handle('render:start', async (event, payload) => {
     audioSettings,
   } = payload;
 
-  const outDir = outputFolder || path.join(app.getAppPath(), 'output');
+  if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
+    throw new Error('ffmpeg tidak ditemukan — coba install ulang aplikasi');
+  }
+
+  const outDir = outputFolder || getDefaultOutputDir();
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
   const base = path.basename(videoPath, path.extname(videoPath));
@@ -341,7 +396,8 @@ ipcMain.handle('render:start', async (event, payload) => {
       outputOpts.push('-c:a', 'aac');
     }
 
-    outputOpts.push('-c:v', 'libx264', '-crf', '18', '-preset', 'medium');
+    outputOpts.push('-c:v', 'libx264', '-crf', '18', '-preset', 'medium', '-pix_fmt', 'yuv420p');
+    outputOpts.push('-movflags', '+faststart');
     outputOpts.push('-y');
 
     cmd.outputOptions(outputOpts).output(outPath);
@@ -358,11 +414,12 @@ ipcMain.handle('render:start', async (event, payload) => {
       resolve({ success: true, outputPath: outPath });
     });
 
-    cmd.on('error', (err) => {
+    cmd.on('error', (err, _stdout, stderr) => {
       if (hasCues && fs.existsSync(assPath)) {
         try { fs.unlinkSync(assPath); } catch (_) { /* ignore */ }
       }
-      reject(err.message || String(err));
+      const detail = stderr?.trim() || err.message || String(err);
+      reject(detail.split('\n').slice(-3).join(' ') || 'Render gagal');
     });
 
     cmd.run();

@@ -64,13 +64,27 @@
           <p>atau klik <strong>Buka Video</strong> — mp4, mov, mkv</p>
         </div>
         <div id="playerStage" class="player-stage hidden">
-          <video id="videoPlayer" controls></video>
+          <video id="videoPlayer" playsinline preload="metadata"></video>
           <canvas id="overlayCanvas"></canvas>
           <div id="canvasHint" class="canvas-hint hidden">
-            <span>Drag untuk gambar blur box · double-click fullscreen</span>
+            <span>Space = putar/jeda · E = mode edit · drag gambar blur box</span>
           </div>
           <button id="btnFullscreen" class="btn-fullscreen" type="button" title="Fullscreen (F)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+          </button>
+        </div>
+        <div id="transportBar" class="transport-bar hidden">
+          <div id="playStatus" class="play-status" title="Tekan Space untuk putar / jeda">
+            <svg id="iconPlay" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <svg id="iconPause" class="hidden" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            <span class="play-status-key">Space</span>
+          </div>
+          <span id="timeCurrent" class="transport-time">00:00</span>
+          <input type="range" id="seekBar" class="transport-seek" min="0" max="1000" value="0" step="1" />
+          <span id="timeDuration" class="transport-time">00:00</span>
+          <button id="btnEditMode" class="btn-transport btn-edit-mode" type="button" title="Toggle mode edit blur box (E)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+            <span id="editModeLabel">Mode Putar</span>
           </button>
         </div>
       </div>
@@ -229,7 +243,7 @@
           </button>
           <div id="outputInfo" class="output-path">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            <span>Default: <code>output/</code></span>
+            <span>Default: <code>Documents/DubClean/output/</code></span>
           </div>
           <div id="renderResult" class="render-result"></div>
         </section>

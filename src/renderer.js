@@ -7,6 +7,8 @@ let cues = [];
 let audioFile = null;
 let outputFolder = null;
 let selectedBoxIndex = -1;
+let editMode = false;
+let isSeeking = false;
 
 let scaleX = 1;
 let scaleY = 1;
@@ -46,6 +48,14 @@ const srtEmpty = document.getElementById('srtEmpty');
 const blurCount = document.getElementById('blurCount');
 const canvasHint = document.getElementById('canvasHint');
 const emptyState = document.getElementById('emptyState');
+const transportBar = document.getElementById('transportBar');
+const iconPlay = document.getElementById('iconPlay');
+const iconPause = document.getElementById('iconPause');
+const seekBar = document.getElementById('seekBar');
+const timeCurrent = document.getElementById('timeCurrent');
+const timeDuration = document.getElementById('timeDuration');
+const btnEditMode = document.getElementById('btnEditMode');
+const editModeLabel = document.getElementById('editModeLabel');
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -56,10 +66,9 @@ function setRenderResult(message, type = '') {
 }
 
 function updateOutputPath(folder) {
-  const label = folder || 'output/';
   outputInfo.innerHTML = `
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-    <span>${folder ? folder : 'Default: <code>output/</code>'}</span>
+    <span>${folder ? folder : 'Default: <code>Documents/DubClean/output/</code>'}</span>
   `;
 }
 
@@ -107,12 +116,11 @@ function initTabs() {
   });
 }
 
-function pathToFileUrl(filePath) {
-  const normalized = filePath.replace(/\\/g, '/');
-  if (/^[a-zA-Z]:\//.test(normalized)) {
-    return `file:///${normalized}`;
-  }
-  return `file://${normalized}`;
+function formatClock(sec) {
+  if (!Number.isFinite(sec) || sec < 0) return '00:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function formatTime(sec) {
@@ -151,15 +159,18 @@ function layoutPlayerStage() {
   if (!videoMeta) return;
 
   const bounds = playerWrapper.getBoundingClientRect();
+  const transportH = transportBar.classList.contains('hidden') ? 0 : transportBar.offsetHeight;
+  const availW = bounds.width;
+  const availH = Math.max(0, bounds.height - transportH);
   const aspect = videoMeta.width / videoMeta.height;
   let stageW;
   let stageH;
 
-  if (bounds.width / bounds.height > aspect) {
-    stageH = bounds.height;
+  if (availW / availH > aspect) {
+    stageH = availH;
     stageW = stageH * aspect;
   } else {
-    stageW = bounds.width;
+    stageW = availW;
     stageH = stageW / aspect;
   }
 
@@ -168,6 +179,38 @@ function layoutPlayerStage() {
   playerStage.style.width = `${stageW}px`;
   playerStage.style.height = `${stageH}px`;
   playerWrapper.style.setProperty('--video-aspect', `${videoMeta.width} / ${videoMeta.height}`);
+}
+
+function setEditMode(enabled) {
+  editMode = enabled;
+  canvas.classList.toggle('edit-mode', editMode);
+  btnEditMode.classList.toggle('active', editMode);
+  editModeLabel.textContent = editMode ? 'Mode Edit' : 'Mode Putar';
+  canvasHint.classList.toggle('hidden', !editMode || !videoMeta);
+}
+
+function updatePlayPauseUi() {
+  const playing = !video.paused && !video.ended;
+  iconPlay.classList.toggle('hidden', playing);
+  iconPause.classList.toggle('hidden', !playing);
+}
+
+function updateSeekUi() {
+  const dur = video.duration || videoMeta?.duration || 0;
+  timeDuration.textContent = formatClock(dur);
+  if (!isSeeking && dur > 0) {
+    seekBar.value = String(Math.round((video.currentTime / dur) * 1000));
+  }
+  timeCurrent.textContent = formatClock(video.currentTime);
+}
+
+function togglePlayPause() {
+  if (!videoMeta) return;
+  if (video.paused || video.ended) {
+    video.play().catch(() => {});
+  } else {
+    video.pause();
+  }
 }
 
 function updateScale() {
@@ -328,7 +371,7 @@ function endBoxInteraction() {
 }
 
 canvas.addEventListener('mousedown', (e) => {
-  if (!videoMeta) return;
+  if (!videoMeta || !editMode) return;
   const { x: mx, y: my } = getStageCoords(e.clientX, e.clientY);
 
   const hit = hitTest(mx, my);
@@ -360,7 +403,7 @@ canvas.addEventListener('mousedown', (e) => {
 });
 
 canvas.addEventListener('mousemove', (e) => {
-  if (!videoMeta) return;
+  if (!videoMeta || !editMode) return;
   const { x: mx, y: my } = getStageCoords(e.clientX, e.clientY);
 
   if (isDrawing) {
@@ -415,6 +458,7 @@ canvas.addEventListener('mousemove', (e) => {
 });
 
 canvas.addEventListener('mouseup', (e) => {
+  if (!editMode) return;
   if (isDrawing) {
     const { x: mx, y: my } = getStageCoords(e.clientX, e.clientY);
 
@@ -573,19 +617,29 @@ function renderSrtList() {
 
 async function loadVideo(path) {
   videoPath = path;
-  video.src = pathToFileUrl(path);
   setRenderResult('');
   playerWrapper.classList.add('has-video');
   playerStage.classList.remove('hidden');
-  canvasHint.classList.remove('hidden');
+  transportBar.classList.remove('hidden');
+  setEditMode(false);
 
   try {
-    videoMeta = await window.api.getVideoMeta(path);
+    const [meta, src] = await Promise.all([
+      window.api.getVideoMeta(path),
+      window.api.getVideoSrc(path),
+    ]);
+    videoMeta = meta;
+    video.src = src;
+    video.load();
+
     const name = path.split(/[/\\]/).pop();
     updateVideoMetaPills(name, videoMeta);
 
     document.getElementById('audioMode').value = videoMeta.hasAudio ? 'replace' : 'add';
     btnRender.disabled = false;
+    timeDuration.textContent = formatClock(videoMeta.duration);
+    seekBar.value = '0';
+    timeCurrent.textContent = '00:00';
   } catch (err) {
     updateVideoMetaPills(null, null);
     videoInfo.innerHTML = `<span class="meta-pill warn">Error: ${err}</span>`;
@@ -622,12 +676,66 @@ btnFullscreen?.addEventListener('click', (e) => {
   toggleFullscreen();
 });
 
+function isTypingInField() {
+  const el = document.activeElement;
+  if (!el) return false;
+  if (el.matches('textarea, select')) return true;
+  if (el.matches('input') && !el.matches('[type="range"]')) return true;
+  return false;
+}
+
 document.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() !== 'f' || e.ctrlKey || e.metaKey || e.altKey) return;
   if (!videoMeta) return;
-  if (document.activeElement?.matches('input, textarea, select')) return;
-  e.preventDefault();
-  toggleFullscreen();
+
+  if (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.altKey && !isTypingInField()) {
+    e.preventDefault();
+    togglePlayPause();
+    return;
+  }
+
+  if (isTypingInField()) return;
+
+  if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    toggleFullscreen();
+    return;
+  }
+
+  if (e.key.toLowerCase() === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    setEditMode(!editMode);
+  }
+});
+
+btnEditMode?.addEventListener('click', () => setEditMode(!editMode));
+
+seekBar?.addEventListener('input', () => {
+  isSeeking = true;
+  const dur = video.duration || videoMeta?.duration || 0;
+  if (dur > 0) {
+    video.currentTime = (parseInt(seekBar.value, 10) / 1000) * dur;
+    timeCurrent.textContent = formatClock(video.currentTime);
+  }
+});
+
+seekBar?.addEventListener('change', () => {
+  isSeeking = false;
+});
+
+video.addEventListener('play', updatePlayPauseUi);
+video.addEventListener('pause', updatePlayPauseUi);
+video.addEventListener('ended', updatePlayPauseUi);
+video.addEventListener('timeupdate', updateSeekUi);
+video.addEventListener('loadedmetadata', () => {
+  if (videoMeta && video.duration && !videoMeta.duration) {
+    videoMeta.duration = video.duration;
+    updateVideoMetaPills(videoPath.split(/[/\\]/).pop(), videoMeta);
+  }
+  updateSeekUi();
+});
+video.addEventListener('error', () => {
+  const msg = video.error?.message || 'Gagal memuat preview video';
+  videoInfo.innerHTML = `<span class="meta-pill warn">Preview: ${msg}</span>`;
 });
 
 // ── Drag & drop ──────────────────────────────────────────────────
@@ -806,6 +914,7 @@ document.getElementById('btnRender').addEventListener('click', async () => {
 // ── Init ─────────────────────────────────────────────────────────
 
 video.addEventListener('loadedmetadata', onVideoResize);
+video.addEventListener('loadeddata', onVideoResize);
 
 updateFullscreenUi();
 
