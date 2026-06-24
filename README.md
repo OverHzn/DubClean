@@ -34,30 +34,103 @@ Generate SRT di [SublyAI](https://github.com/OverHzn/sublyai) (`outputs/<job_id>
 
 ---
 
-## Install (Windows) — pakai installer
+## Panduan Install
 
-Cara termudah, **tanpa Node.js**:
+DubClean **self-contained** — ffmpeg sudah dibundle, tidak perlu install ffmpeg atau Node.js kalau pakai installer/portable.
 
-1. Build installer (sekali, dari source) — lihat [Build](#build-installer) di bawah
-2. Double-click **`dist\DubClean Setup 1.0.0.exe`**
-3. Install → buka **DubClean** dari Start Menu / desktop shortcut
+### Kebutuhan sistem
 
-Atau pakai **portable** (tanpa install):
+| Platform | Minimum |
+|----------|---------|
+| Windows | Windows 10/11 64-bit |
+| Linux | Distro modern 64-bit (AppImage) |
+| RAM | 4 GB+ (8 GB disarankan untuk render video panjang) |
+| Storage | ~200 MB untuk app + ruang untuk file output video |
 
+---
+
+### Opsi 1 — Download siap pakai (disarankan)
+
+Cara termudah untuk end user — **tanpa Node.js, tanpa build manual**.
+
+1. Buka **[GitHub Releases](https://github.com/OverHzn/DubClean/releases)**
+2. Download file sesuai kebutuhan:
+
+| File | Platform | Keterangan |
+|------|----------|------------|
+| `DubClean Setup 1.0.0.exe` | Windows | Installer NSIS — disarankan |
+| `DubClean 1.0.0.exe` | Windows | Portable, tanpa install |
+| `DubClean-1.0.0.AppImage` | Linux | Jalankan langsung, tanpa install |
+
+3. Lanjut ke langkah install di bawah sesuai file yang kamu download.
+
+> Belum ada release? Build dulu dari source — lihat [Opsi 4 — Build installer sendiri](#opsi-4--build-installer-sendiri).
+
+---
+
+### Opsi 2 — Windows (Installer)
+
+Untuk pemakaian harian — app masuk Start Menu & bisa bikin shortcut desktop.
+
+1. Download **`DubClean Setup 1.0.0.exe`** dari [Releases](https://github.com/OverHzn/DubClean/releases)
+2. Double-click file installer
+3. Kalau Windows SmartScreen muncul → klik **More info** → **Run anyway** (app belum di-sign)
+4. Pilih folder install (default: `C:\Users\<nama>\AppData\Local\Programs\DubClean`)
+5. Centang **Create desktop shortcut** kalau mau icon di desktop
+6. Klik **Install** → tunggu selesai → **Finish**
+7. Buka **DubClean** dari Start Menu atau shortcut desktop
+
+**Setelah pertama kali buka:**
+
+- Drag-drop video ke area preview, atau klik **Buka Video**
+- Hasil render default tersimpan di folder `output/` di sebelah lokasi project (dev) atau folder yang kamu pilih di tab **Export**
+
+**Uninstall:** Settings → Apps → DubClean → Uninstall, atau lewat **Add or Remove Programs**.
+
+---
+
+### Opsi 3 — Windows (Portable)
+
+Cocok kalau mau jalanin dari USB / folder tanpa jejak di sistem.
+
+1. Download **`DubClean 1.0.0.exe`** dari [Releases](https://github.com/OverHzn/DubClean/releases)
+2. Pindahkan file ke folder mana saja (misal `D:\Tools\DubClean\`)
+3. Double-click langsung — **tidak perlu install**
+4. Bisa buat shortcut manual: klik kanan file → **Create shortcut**
+
+> Portable menyimpan data app di `%LOCALAPPDATA%\DubClean` (userData), sama seperti versi installer.
+
+---
+
+### Opsi 4 — Linux (AppImage)
+
+1. Download **`DubClean-1.0.0.AppImage`** dari [Releases](https://github.com/OverHzn/DubClean/releases)
+2. Beri permission execute:
+
+```bash
+chmod +x DubClean-1.0.0.AppImage
 ```
-dist\DubClean 1.0.0.exe
+
+3. Jalankan:
+
+```bash
+./DubClean-1.0.0.AppImage
+```
+
+Opsional — integrasi ke menu aplikasi:
+
+```bash
+# AppImageLauncher (kalau terpasang) biasanya auto-detect
+# atau jalankan manual tiap kali
 ```
 
 ---
 
-## Install & Run (dari source)
+### Opsi 5 — Dari source (development)
 
-### Requirements
+Untuk kontribusi, debug, atau build sendiri.
 
-- Node.js 18+
-- Windows atau Linux
-
-### Development
+**Requirements:** Node.js 18+, Git, Windows atau Linux
 
 ```bash
 git clone https://github.com/OverHzn/DubClean.git
@@ -72,35 +145,58 @@ Kalau `npm start` error `EBUSY` (umum di folder OneDrive):
 npm run start:direct
 ```
 
+Tips:
+
+- Hindari clone di folder OneDrive/sync — bisa bikin file lock saat Electron jalan
+- Lebih aman di path lokal, misal `C:\Dev\DubClean`
+
 ---
 
-## Build installer
+### Opsi 6 — Build installer sendiri
+
+Kalau mau generate file `.exe` / AppImage dari source.
+
+**Requirements:** Node.js 18+, npm
 
 ```bash
-# Windows
-npm run build:win
+git clone https://github.com/OverHzn/DubClean.git
+cd DubClean
+npm install
 
-# atau double-click
-build-app.bat
+# Windows — installer + portable
+npm run build:win
+# atau double-click build-app.bat
 ```
 
-### Hasil build
+**Hasil build Windows:**
 
 | File | Kegunaan |
 |------|----------|
 | `dist\DubClean Setup 1.0.0.exe` | Installer NSIS (~99 MB) |
 | `dist\DubClean 1.0.0.exe` | Portable, tanpa install |
-| `dist\win-unpacked\DubClean.exe` | Versi unpacked |
+| `dist\win-unpacked\DubClean.exe` | Versi unpacked (debug) |
 
-Installer memakai custom icon dari `build/icon.ico` (bukan icon Electron default).
-
-Linux:
+**Linux:**
 
 ```bash
-npm run build:linux    # AppImage
+npm run build:linux    # → dist/DubClean-1.0.0.AppImage
 ```
 
-> Folder `dist/` tidak di-commit ke git — hasil build tetap lokal setelah `npm run build:win`.
+Installer memakai custom icon dari `build/icon.ico` / `build/icon.png` (bukan icon Electron default).
+
+> Folder `dist/` tidak di-commit ke git — hasil build tetap lokal setelah build.
+
+---
+
+### Ringkasan — pilih yang mana?
+
+| Kamu mau… | Pakai |
+|-----------|-------|
+| Pakai app cepat, tanpa ribet | **Opsi 1 + 2** — download installer |
+| Jalanin dari USB / tanpa install | **Opsi 1 + 3** — portable |
+| Pakai di Linux | **Opsi 1 + 4** — AppImage |
+| Edit code / debug | **Opsi 5** — dari source |
+| Bagi installer ke orang lain | **Opsi 6** — build sendiri, upload ke Releases |
 
 ---
 
@@ -203,8 +299,12 @@ DubClean/
 
 | Masalah | Solusi |
 |---------|--------|
+| Windows SmartScreen blokir installer | Klik **More info** → **Run anyway** — app belum code-signed |
+| Installer/portable tidak jalan | Pastikan Windows 64-bit; coba run as Administrator sekali |
 | `npm start` → `EBUSY` | Tutup app Electron lain, atau `npm run start:direct` |
 | Project di OneDrive | Pindah ke `C:\Dev\DubClean` kalau file sering terkunci |
+| Build gagal / `dist/` kosong | Pastikan `npm install` sukses; jalankan `npm run build:win` lagi |
+| AppImage tidak execute (Linux) | `chmod +x DubClean-1.0.0.AppImage` |
 | Render gagal | Pastikan video path valid, folder output ada, cek error di UI |
 | Watermark masih kelihatan | Perbesar box atau naikkan intensitas blur |
 

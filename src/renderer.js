@@ -28,6 +28,8 @@ const video = document.getElementById('videoPlayer');
 const canvas = document.getElementById('overlayCanvas');
 const ctx = canvas.getContext('2d');
 const playerWrapper = document.getElementById('playerWrapper');
+const playerStage = document.getElementById('playerStage');
+const btnFullscreen = document.getElementById('btnFullscreen');
 const videoInfo = document.getElementById('videoInfo');
 const blurBoxList = document.getElementById('blurBoxList');
 const srtInfo = document.getElementById('srtInfo');
@@ -145,13 +147,77 @@ function getAudioSettings() {
   };
 }
 
+function layoutPlayerStage() {
+  if (!videoMeta) return;
+
+  const bounds = playerWrapper.getBoundingClientRect();
+  const aspect = videoMeta.width / videoMeta.height;
+  let stageW;
+  let stageH;
+
+  if (bounds.width / bounds.height > aspect) {
+    stageH = bounds.height;
+    stageW = stageH * aspect;
+  } else {
+    stageW = bounds.width;
+    stageH = stageW / aspect;
+  }
+
+  stageW = Math.floor(stageW);
+  stageH = Math.floor(stageH);
+  playerStage.style.width = `${stageW}px`;
+  playerStage.style.height = `${stageH}px`;
+  playerWrapper.style.setProperty('--video-aspect', `${videoMeta.width} / ${videoMeta.height}`);
+}
+
 function updateScale() {
-  if (!videoMeta || !video.videoWidth) return;
-  const rect = video.getBoundingClientRect();
-  canvas.width = rect.width;
-  canvas.height = rect.height;
-  scaleX = videoMeta.width / rect.width;
-  scaleY = videoMeta.height / rect.height;
+  if (!videoMeta || !playerStage.offsetWidth) return;
+  const rect = playerStage.getBoundingClientRect();
+  const w = Math.floor(rect.width);
+  const h = Math.floor(rect.height);
+  if (!w || !h) return;
+
+  canvas.width = w;
+  canvas.height = h;
+  scaleX = videoMeta.width / w;
+  scaleY = videoMeta.height / h;
+}
+
+function getStageCoords(clientX, clientY) {
+  const rect = playerStage.getBoundingClientRect();
+  return {
+    x: clientX - rect.left,
+    y: clientY - rect.top,
+  };
+}
+
+function isFullscreen() {
+  return document.fullscreenElement === playerWrapper;
+}
+
+function updateFullscreenUi() {
+  if (!btnFullscreen) return;
+  btnFullscreen.title = isFullscreen() ? 'Keluar fullscreen (F / Esc)' : 'Fullscreen (F)';
+}
+
+async function toggleFullscreen() {
+  if (!videoMeta) return;
+  try {
+    if (isFullscreen()) {
+      await document.exitFullscreen();
+    } else {
+      await playerWrapper.requestFullscreen();
+    }
+  } catch {
+    // fullscreen ditolak browser/OS — abaikan
+  }
+}
+
+function refreshPlayerLayout() {
+  if (!videoMeta) return;
+  layoutPlayerStage();
+  updateScale();
+  drawCanvas();
 }
 
 function canvasToVideo(cx, cy) {
@@ -263,9 +329,7 @@ function endBoxInteraction() {
 
 canvas.addEventListener('mousedown', (e) => {
   if (!videoMeta) return;
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
+  const { x: mx, y: my } = getStageCoords(e.clientX, e.clientY);
 
   const hit = hitTest(mx, my);
   if (hit?.type === 'resize') {
@@ -297,9 +361,7 @@ canvas.addEventListener('mousedown', (e) => {
 
 canvas.addEventListener('mousemove', (e) => {
   if (!videoMeta) return;
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
+  const { x: mx, y: my } = getStageCoords(e.clientX, e.clientY);
 
   if (isDrawing) {
     drawCanvas();
@@ -354,9 +416,7 @@ canvas.addEventListener('mousemove', (e) => {
 
 canvas.addEventListener('mouseup', (e) => {
   if (isDrawing) {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+    const { x: mx, y: my } = getStageCoords(e.clientX, e.clientY);
 
     const x1 = Math.min(drawStart.x, mx);
     const y1 = Math.min(drawStart.y, my);
@@ -516,6 +576,7 @@ async function loadVideo(path) {
   video.src = pathToFileUrl(path);
   setRenderResult('');
   playerWrapper.classList.add('has-video');
+  playerStage.classList.remove('hidden');
   canvasHint.classList.remove('hidden');
 
   try {
@@ -536,15 +597,37 @@ async function loadVideo(path) {
 }
 
 function onVideoResize() {
-  updateScale();
-  drawCanvas();
+  refreshPlayerLayout();
 }
 
-window.addEventListener('resize', () => {
+const playerResizeObserver = new ResizeObserver(() => {
+  if (videoMeta) refreshPlayerLayout();
+});
+playerResizeObserver.observe(playerWrapper);
+
+document.addEventListener('fullscreenchange', () => {
+  updateFullscreenUi();
   if (videoMeta) {
-    updateScale();
-    drawCanvas();
+    requestAnimationFrame(() => refreshPlayerLayout());
   }
+});
+
+playerStage.addEventListener('dblclick', (e) => {
+  if (e.target.closest('.btn-fullscreen')) return;
+  toggleFullscreen();
+});
+
+btnFullscreen?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleFullscreen();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() !== 'f' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!videoMeta) return;
+  if (document.activeElement?.matches('input, textarea, select')) return;
+  e.preventDefault();
+  toggleFullscreen();
 });
 
 // ── Drag & drop ──────────────────────────────────────────────────
@@ -723,6 +806,8 @@ document.getElementById('btnRender').addEventListener('click', async () => {
 // ── Init ─────────────────────────────────────────────────────────
 
 video.addEventListener('loadedmetadata', onVideoResize);
+
+updateFullscreenUi();
 
 outputFolder = null;
 initTabs();

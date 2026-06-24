@@ -63,10 +63,15 @@
           <h3>Drop video di sini</h3>
           <p>atau klik <strong>Buka Video</strong> — mp4, mov, mkv</p>
         </div>
-        <video id="videoPlayer" controls></video>
-        <canvas id="overlayCanvas"></canvas>
-        <div id="canvasHint" class="canvas-hint hidden">
-          <span>Drag untuk gambar blur box</span>
+        <div id="playerStage" class="player-stage hidden">
+          <video id="videoPlayer" controls></video>
+          <canvas id="overlayCanvas"></canvas>
+          <div id="canvasHint" class="canvas-hint hidden">
+            <span>Drag untuk gambar blur box · double-click fullscreen</span>
+          </div>
+          <button id="btnFullscreen" class="btn-fullscreen" type="button" title="Fullscreen (F)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+          </button>
         </div>
       </div>
     </section>
