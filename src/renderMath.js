@@ -14,33 +14,27 @@ function classifyAspectRatio(videoWidth, videoHeight) {
   return 'horizontal';
 }
 
-function computeDynamicFontSize(videoWidth, videoHeight, aspectClass) {
-  let ratio = 0.045;
-  if (aspectClass === 'vertical') ratio = 0.0475;
-  else if (aspectClass === 'horizontal') ratio = 0.05;
-  return clamp(Math.round(videoHeight * ratio), 24, 64);
+function computeDynamicFontSize(videoWidth, videoHeight) {
+  return clamp(Math.round(videoHeight * 0.045), 28, 68);
 }
 
-function computeSafeMargins(videoWidth, videoHeight, aspectClass) {
-  const safeMarginX = Math.round(videoWidth * 0.05);
-  const safeMarginY = Math.round(videoHeight * 0.05);
-  let bottomRatio = 0.1;
-  if (aspectClass === 'horizontal') bottomRatio = 0.08;
-  else if (aspectClass === 'square') bottomRatio = 0.09;
-  const safeBottomMargin = clamp(Math.round(videoHeight * bottomRatio), 60, 160);
+function computeSafeMargins(videoWidth, videoHeight) {
+  const safeMarginX = Math.round(videoWidth * 0.04);
+  const safeMarginY = Math.round(videoHeight * 0.04);
+  const safeBottomMargin = clamp(Math.round(videoHeight * 0.085), 55, 150);
   return { safeMarginX, safeMarginY, safeBottomMargin };
 }
 
 function computeMaxWidthPercent(aspectClass, userPercent) {
   if (userPercent != null && userPercent > 0) return clamp(userPercent, 30, 100);
-  if (aspectClass === 'vertical') return 88;
-  if (aspectClass === 'horizontal') return 80;
-  return 85;
+  if (aspectClass === 'vertical') return 86;
+  if (aspectClass === 'horizontal') return 78;
+  return 84;
 }
 
 function computeStrokeWidth(fontSize, userWidth) {
   if (userWidth != null && userWidth >= 0) return clamp(Math.round(userWidth), 0, 10);
-  return clamp(Math.round(fontSize * 0.08), 2, 4);
+  return clamp(Math.round(fontSize * 0.1), 3, 6);
 }
 
 function computePadding(fontSize) {
@@ -108,11 +102,12 @@ function computeSubtitleLayout(videoWidth, videoHeight, userStyle) {
   const aspectClass = classifyAspectRatio(videoWidth, videoHeight);
   const aspectRatio = videoWidth / videoHeight;
 
-  const dynamicFontSize = computeDynamicFontSize(videoWidth, videoHeight, aspectClass);
+  const dynamicFontSize = computeDynamicFontSize(videoWidth, videoHeight);
   const fontSizePx = style.font_size != null ? clamp(Math.round(style.font_size), 12, 120) : dynamicFontSize;
   const fontSizePercent = fontSizePx / videoHeight;
+  const lineHeight = 1.2;
 
-  const margins = computeSafeMargins(videoWidth, videoHeight, aspectClass);
+  const margins = computeSafeMargins(videoWidth, videoHeight);
   const marginBottom =
     style.margin_bottom != null
       ? clamp(Math.round(style.margin_bottom), 0, Math.round(videoHeight * 0.4))
@@ -123,19 +118,21 @@ function computeSubtitleLayout(videoWidth, videoHeight, userStyle) {
   const strokeWidthPx = computeStrokeWidth(fontSizePx, style.outline_width);
   const padding = computePadding(fontSizePx);
 
-  const marginL = Math.round((videoWidth - subtitleMaxWidth) / 2);
+  const marginL = Math.max(margins.safeMarginX, Math.round((videoWidth - subtitleMaxWidth) / 2));
   const marginR = marginL;
-  const marginV = Math.round(marginBottom + strokeWidthPx + padding * 0.25);
 
   let alignment = 2;
   let subtitleXPercent = 0.5;
   let subtitleYPercent = 1 - marginBottom / videoHeight;
+  let marginV = Math.round(marginBottom + strokeWidthPx);
 
   if (style.position === 'top') {
     alignment = 8;
-    subtitleYPercent = (margins.safeMarginY + padding) / videoHeight;
+    marginV = Math.round(margins.safeMarginY + strokeWidthPx);
+    subtitleYPercent = marginV / videoHeight;
   } else if (style.position === 'center') {
     alignment = 5;
+    marginV = 0;
     subtitleYPercent = 0.5;
   } else if (style.position === 'custom') {
     alignment = 2;
@@ -144,6 +141,7 @@ function computeSubtitleLayout(videoWidth, videoHeight, userStyle) {
     } else if (style.custom_y != null) {
       subtitleYPercent = clamp(style.custom_y / videoHeight, 0.05, 0.95);
     }
+    marginV = Math.round((1 - subtitleYPercent) * videoHeight);
   }
 
   const subtitleX = Math.round(subtitleXPercent * videoWidth);
@@ -168,11 +166,11 @@ function computeSubtitleLayout(videoWidth, videoHeight, userStyle) {
     subtitlePadding: padding,
     subtitleMaxWidth,
     subtitleMaxWidthPercent: maxWidthPercent,
-    subtitleMarginL: Math.max(margins.safeMarginX, marginL),
-    subtitleMarginR: Math.max(margins.safeMarginX, marginR),
+    subtitleMarginL: marginL,
+    subtitleMarginR: marginR,
     subtitleMarginV: marginV,
     subtitleAlignment: alignment,
-    lineHeight: 1.2,
+    lineHeight,
   };
 }
 
@@ -219,6 +217,7 @@ function buildRenderConfig(payload) {
     subtitleMarginR: subtitle.subtitleMarginR,
     subtitleMarginV: subtitle.subtitleMarginV,
     subtitleAlignment: subtitle.subtitleAlignment,
+    lineHeight: subtitle.lineHeight,
 
     blurEnabled,
     blurRegions: blurPx,
@@ -292,8 +291,8 @@ function adjustBlurForPreview(blurRegions, previewStart) {
 
 function getDefaultSubtitleUiValues(videoWidth, videoHeight) {
   const aspectClass = classifyAspectRatio(videoWidth, videoHeight);
-  const fontSize = computeDynamicFontSize(videoWidth, videoHeight, aspectClass);
-  const margins = computeSafeMargins(videoWidth, videoHeight, aspectClass);
+  const fontSize = computeDynamicFontSize(videoWidth, videoHeight);
+  const margins = computeSafeMargins(videoWidth, videoHeight);
   const maxWidth = computeMaxWidthPercent(aspectClass);
   const stroke = computeStrokeWidth(fontSize);
   return {
@@ -301,6 +300,8 @@ function getDefaultSubtitleUiValues(videoWidth, videoHeight) {
     margin_bottom: margins.safeBottomMargin,
     max_width_percent: maxWidth,
     outline_width: stroke,
+    box_enabled: false,
+    box_opacity: 0,
   };
 }
 

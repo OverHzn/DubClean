@@ -1,6 +1,6 @@
 {
   "name": "dubclean",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Desktop app untuk blur watermark, burn-in subtitle SRT, dan add/replace audio",
   "main": "src/main.js",
   "scripts": {

@@ -234,18 +234,22 @@ function formatTime(sec) {
 }
 
 function getSubtitleStyle() {
+  const boxEnabled = document.getElementById('subBoxEnabled').checked;
   return {
     position: document.getElementById('subPosition').value,
     custom_y_percent: parseFloat(document.getElementById('subCustomY').value) / 100 || 0.85,
     font: 'Arial',
     font_size: parseInt(document.getElementById('subFontSize').value, 10) || 42,
     text_color: document.getElementById('subTextColor').value,
+    box_enabled: boxEnabled,
     box_color: document.getElementById('subBoxColor').value,
-    box_opacity: parseInt(document.getElementById('subBoxOpacity').value, 10) / 100,
+    box_opacity: boxEnabled
+      ? parseInt(document.getElementById('subBoxOpacity').value, 10) / 100
+      : 0,
     outline_color: '#000000',
-    outline_width: parseInt(document.getElementById('subOutlineWidth').value, 10) || 2,
-    margin_bottom: parseInt(document.getElementById('subMarginBottom').value, 10) || 120,
-    max_width_percent: parseInt(document.getElementById('subMaxWidth').value, 10) || 80,
+    outline_width: parseInt(document.getElementById('subOutlineWidth').value, 10) || 3,
+    margin_bottom: parseInt(document.getElementById('subMarginBottom').value, 10) || 92,
+    max_width_percent: parseInt(document.getElementById('subMaxWidth').value, 10) || 78,
   };
 }
 
@@ -292,16 +296,24 @@ function getRenderConfig() {
 
 function applyDynamicSubtitleDefaults(meta) {
   const defaults = RM.getDefaultSubtitleUiValues(meta.width, meta.height);
+  document.getElementById('subPosition').value = 'bottom';
   document.getElementById('subFontSize').value = defaults.font_size;
   document.getElementById('subMarginBottom').value = defaults.margin_bottom;
   document.getElementById('subMaxWidth').value = defaults.max_width_percent;
   document.getElementById('subOutlineWidth').value = defaults.outline_width;
+  document.getElementById('subBoxEnabled').checked = defaults.box_enabled;
+  document.getElementById('subBoxOpacity').value = 0;
+  document.getElementById('subBoxOpacityNum').value = 0;
+  updateSubtitleBoxUi();
 
-  const aspectClass = RM.classifyAspectRatio(meta.width, meta.height);
-  let bottomPercent = 90;
-  if (aspectClass === 'horizontal') bottomPercent = 92;
-  else if (aspectClass === 'square') bottomPercent = 91;
-  document.getElementById('subCustomY').value = bottomPercent;
+  const bottomPercent = ((meta.height - defaults.margin_bottom) / meta.height) * 100;
+  document.getElementById('subCustomY').value = bottomPercent.toFixed(1);
+}
+
+function updateSubtitleBoxUi() {
+  const enabled = document.getElementById('subBoxEnabled').checked;
+  document.getElementById('subBoxColorRow').classList.toggle('hidden', !enabled);
+  document.getElementById('subBoxOpacityRow').classList.toggle('hidden', !enabled);
 }
 
 function normalizeAllBlurRegions() {
@@ -1016,11 +1028,15 @@ document.getElementById('btnLoadPreset').addEventListener('click', async () => {
   if (style.font_size) document.getElementById('subFontSize').value = style.font_size;
   if (style.text_color) document.getElementById('subTextColor').value = style.text_color;
   if (style.box_color) document.getElementById('subBoxColor').value = style.box_color;
+  const boxEnabled = style.box_enabled === true
+    || (style.box_enabled == null && (style.box_opacity ?? 0) > 0.05);
+  document.getElementById('subBoxEnabled').checked = boxEnabled;
   if (style.box_opacity != null) {
     const op = Math.round(style.box_opacity * 100);
     document.getElementById('subBoxOpacity').value = op;
     document.getElementById('subBoxOpacityNum').value = op;
   }
+  updateSubtitleBoxUi();
   if (style.outline_width != null) document.getElementById('subOutlineWidth').value = style.outline_width;
   if (style.margin_bottom != null) document.getElementById('subMarginBottom').value = style.margin_bottom;
   if (style.max_width_percent != null) document.getElementById('subMaxWidth').value = style.max_width_percent;
@@ -1050,6 +1066,11 @@ function bindStyleChange(el, eventName = 'change') {
 
 document.getElementById('subPosition').addEventListener('change', (e) => {
   document.getElementById('customYRow').classList.toggle('hidden', e.target.value !== 'custom');
+  markPreviewOutdated();
+});
+
+document.getElementById('subBoxEnabled').addEventListener('change', () => {
+  updateSubtitleBoxUi();
   markPreviewOutdated();
 });
 
@@ -1193,6 +1214,7 @@ video.addEventListener('loadedmetadata', onVideoResize);
 video.addEventListener('loadeddata', onVideoResize);
 
 updateFullscreenUi();
+updateSubtitleBoxUi();
 
 outputFolder = null;
 initTabs();

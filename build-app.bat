@@ -8,8 +8,8 @@ call npm run build:win
 
 echo.
 echo === HASIL ===
-echo Installer: dist\DubClean Setup 1.2.0.exe
-echo Portable:  dist\DubClean 1.2.0.exe
+echo Installer: dist\DubClean Setup 1.2.1.exe
+echo Portable:  dist\DubClean 1.2.1.exe
 echo Unpacked:  dist\win-unpacked\DubClean.exe
 echo.
 pause

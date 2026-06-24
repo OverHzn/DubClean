@@ -1,33 +1,32 @@
-## DubClean v1.2.0
+## DubClean v1.2.1
 
-UI utilitas desktop — tampilan editor video profesional, bukan dashboard AI.
+Perbaikan subtitle — gaya cinematic/social-video, tanpa bar hitam full-width.
 
-### Baru
+### Baru / Diperbaiki
 
-- **UI utilitas desktop** — flat, netral, tanpa gradien/glow/glassmorphism
-- **Panel status Export** — Status Preview, Resolusi Video, Durasi Preview, Aspect Ratio
-- **Log Render** — panel teknis collapsible (config FFmpeg, koordinat, hasil)
-- **Kontrol presisi** — slider + input angka untuk opacity box dan volume audio
-- **Label produksi** — Area Blur, Posisi Subtitle, Safe Area, Render Video Final
+- **Subtitle Reference 2** — teks putih bold + outline hitam, bawah tengah, tanpa background bar selebar layar
+- **Posisi dinamis** — font, margin, lebar, dan stroke menyesuaikan resolusi video (vertikal, horizontal, square)
+- **Word wrap** — subtitle otomatis 2–3 baris di dalam safe area
+- **Background Subtitle opsional** — toggle OFF by default; kalau ON, background compact di belakang teks saja
+- **Label UI Indonesia** — Posisi Subtitle, Tengah Bawah, Margin Bawah, Lebar Subtitle, Outline Subtitle
+- **Preview = render final** — pipeline ASS sama untuk Preview Hasil dan Render Video Final
 
-### Dari v1.1.0 (tetap ada)
+### Dari v1.2.0 (tetap ada)
 
-- **Preview Hasil** — render cuplikan sebelum export penuh (pipeline FFmpeg sama)
-- **Validasi preview** — render final aktif setelah preview siap
-- **Koordinat ternormalisasi** — blur & subtitle sesuai resolusi video asli
-- **Subtitle dinamis** — font, margin, stroke menyesuaikan aspect ratio
+- UI utilitas desktop, panel status Export, log render, kontrol presisi
+- Preview Hasil sebelum render final, koordinat blur ternormalisasi
 
 ### Download
 
 | File | Untuk |
 |------|-------|
-| `DubClean Setup 1.2.0.exe` | Windows — installer (disarankan) |
-| `DubClean 1.2.0.exe` | Windows — portable, tanpa install |
+| `DubClean Setup 1.2.1.exe` | Windows — installer (disarankan) |
+| `DubClean 1.2.1.exe` | Windows — portable, tanpa install |
 
 ### Install cepat (Windows)
 
 1. Download **Setup** atau **Portable** di atas
 2. Kalau SmartScreen muncul → **More info** → **Run anyway**
-3. Buka app → atur blur/SRT → **Preview Hasil** → **Render Video Final**
+3. Buka app → import SRT → **Preview Hasil** → cek subtitle bawah tengah → **Render Video Final**
 
 Panduan lengkap: [README — Panduan Install](https://github.com/OverHzn/DubClean#panduan-install)

@@ -2,7 +2,39 @@ const {
   buildRenderConfig,
   adjustCuesForPreview,
   adjustBlurForPreview,
+  clamp,
 } = require('./renderMath');
+
+function estimateCharsPerLine(maxWidth, fontSize) {
+  return Math.max(10, Math.floor(maxWidth / (fontSize * 0.52)));
+}
+
+function wrapCueText(text, maxWidth, fontSize, maxLines = 3) {
+  const maxChars = estimateCharsPerLine(maxWidth, fontSize);
+  const paragraphs = String(text || '').split(/\n/);
+  const lines = [];
+
+  for (const para of paragraphs) {
+    const words = para.trim().split(/\s+/).filter(Boolean);
+    let current = '';
+
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (candidate.length > maxChars && current) {
+        lines.push(current);
+        current = word;
+        if (lines.length >= maxLines) break;
+      } else {
+        current = candidate;
+      }
+    }
+
+    if (current && lines.length < maxLines) lines.push(current);
+    if (lines.length >= maxLines) break;
+  }
+
+  return lines.slice(0, maxLines).join('\\N');
+}
 
 function hexToAssColor(hex, opacity = 1) {
   const h = hex.replace('#', '');
@@ -28,7 +60,9 @@ function generateAss(cues, config) {
   const fontSize = config.subtitleFontSizePx;
   const primary = hexToAssColor(style.text_color || '#FFFFFF');
   const outline = hexToAssColor(style.outline_color || '#000000');
-  const back = hexToAssColor(style.box_color || '#000000', style.box_opacity ?? 0.6);
+  const boxEnabled = style.box_enabled === true;
+  const boxOpacity = boxEnabled ? (style.box_opacity ?? 0.75) : 0;
+  const back = hexToAssColor(style.box_color || '#000000', boxOpacity);
   const outlineWidth = config.subtitleStrokeWidthPx;
   const marginV = config.subtitleMarginV;
   const marginL = config.subtitleMarginL;
@@ -36,6 +70,9 @@ function generateAss(cues, config) {
   const alignment = config.subtitleAlignment;
   const playResX = config.videoWidth;
   const playResY = config.videoHeight;
+  const borderStyle = 1;
+  const shadowDepth = boxEnabled ? clamp(Math.round(fontSize * 0.12), 3, 8) : 0;
+  const lineSpacing = Math.round(fontSize * (config.lineHeight - 1));
 
   const header = `[Script Info]
 Title: DubClean
@@ -47,32 +84,34 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${font},${fontSize},${primary},&H000000FF,${outline},${back},-1,0,0,0,100,100,0,0,3,${outlineWidth},0,${alignment},${marginL},${marginR},${marginV},1
+Style: Default,${font},${fontSize},${primary},&H000000FF,${outline},${back},-1,0,0,0,100,100,${lineSpacing},0,${borderStyle},${outlineWidth},${shadowDepth},${alignment},${marginL},${marginR},${marginV},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
+  const stroke = config.subtitleStrokeWidthPx;
+  const safeTop = config.subtitleSafeMarginY + stroke;
+  const safeBottom = config.videoHeight - config.subtitleSafeMarginY - stroke;
+  const safeLeft = config.subtitleSafeMarginX + stroke;
+  const safeRight = config.videoWidth - config.subtitleSafeMarginX - stroke;
+
   const lines = (cues || []).map((cue) => {
     const start = secondsToAssTime(cue.start);
     const end = secondsToAssTime(cue.end);
-    const text = (cue.text || '').replace(/\n/g, '\\N');
-    let prefix = '{\\q2}';
+    const text = wrapCueText(cue.text, config.subtitleMaxWidth, fontSize);
+    let prefix = '{\\q2\\an' + alignment + '}';
 
     if (style.position === 'custom') {
       const x = Math.round(config.subtitleX);
-      const y = Math.round(config.subtitleY);
-      const pad = config.subtitlePadding;
-      const stroke = config.subtitleStrokeWidthPx;
-      const clampedX = Math.max(
-        config.subtitleSafeMarginX + stroke,
-        Math.min(x, config.videoWidth - config.subtitleSafeMarginX - stroke)
-      );
-      const clampedY = Math.max(
-        config.subtitleSafeMarginY + stroke + pad,
-        Math.min(y, config.videoHeight - config.subtitleBottomMargin - stroke)
-      );
-      prefix = `{\\pos(${clampedX},${clampedY})\\q2}`;
+      let y = Math.round(config.subtitleY);
+      const lineCount = text.split('\\N').length;
+      const estimatedHeight = Math.round(fontSize * config.lineHeight * lineCount);
+      y = Math.min(y, safeBottom - estimatedHeight);
+      y = Math.max(y, safeTop);
+      const clampedX = clamp(x, safeLeft, safeRight);
+      const clampedY = clamp(y, safeTop, safeBottom - estimatedHeight);
+      prefix = `{\\pos(${clampedX},${clampedY})\\q2\\an${alignment}}`;
     }
 
     return `Dialogue: 0,${start},${end},Default,,0,0,0,,${prefix}${text}`;

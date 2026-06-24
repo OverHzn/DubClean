@@ -10,7 +10,7 @@
 <body>
   <header class="app-header">
     <div class="brand">
-      <h1>DubClean <span class="brand-tag" id="appVersion">v1.2.0</span></h1>
+      <h1>DubClean <span class="brand-tag" id="appVersion">v1.2.1</span></h1>
     </div>
     <div class="header-actions">
       <button id="btnSavePreset" class="btn btn-ghost" title="Simpan preset ke file JSON">Simpan Preset</button>
@@ -104,11 +104,11 @@
           <div class="section-label">Posisi Subtitle</div>
           <div class="form-grid">
             <label class="field">
-              <span>Posisi</span>
+              <span>Posisi Subtitle</span>
               <select id="subPosition">
-                <option value="bottom">Bawah tengah</option>
-                <option value="top">Atas tengah</option>
+                <option value="bottom" selected>Tengah Bawah</option>
                 <option value="center">Tengah</option>
+                <option value="top">Tengah Atas</option>
                 <option value="custom">Custom Y</option>
               </select>
             </label>
@@ -121,20 +121,20 @@
               <input type="number" id="subFontSize" value="42" min="12" max="120" />
             </label>
             <label class="field">
-              <span>Outline (px)</span>
-              <input type="number" id="subOutlineWidth" value="2" min="0" max="10" />
+              <span>Outline Subtitle</span>
+              <input type="number" id="subOutlineWidth" value="3" min="0" max="10" />
             </label>
           </div>
 
           <div class="section-label">Safe Area</div>
           <div class="form-grid">
             <label class="field">
-              <span>Margin Bawah (px)</span>
-              <input type="number" id="subMarginBottom" value="120" min="0" />
+              <span>Margin Bawah</span>
+              <input type="number" id="subMarginBottom" value="92" min="0" />
             </label>
             <label class="field">
-              <span>Max Lebar (%)</span>
-              <input type="number" id="subMaxWidth" value="80" min="30" max="100" />
+              <span>Lebar Subtitle</span>
+              <input type="number" id="subMaxWidth" value="78" min="30" max="100" />
             </label>
           </div>
 
@@ -147,18 +147,25 @@
                 <span class="color-val" id="subTextColorVal">#ffffff</span>
               </div>
             </label>
-            <label class="field">
+            <label class="field field-full">
+              <span>Background Subtitle</span>
+              <label class="toggle-field">
+                <input type="checkbox" id="subBoxEnabled" />
+                <span>Aktifkan background di belakang teks</span>
+              </label>
+            </label>
+            <label id="subBoxColorRow" class="field hidden">
               <span>Warna Box</span>
               <div class="color-field">
                 <input type="color" id="subBoxColor" value="#000000" />
                 <span class="color-val" id="subBoxColorVal">#000000</span>
               </div>
             </label>
-            <label class="field field-full">
+            <label id="subBoxOpacityRow" class="field field-full hidden">
               <span>Opacity Box</span>
               <div class="field-range-row">
-                <input type="range" class="range" id="subBoxOpacity" min="0" max="100" value="60" />
-                <input type="number" id="subBoxOpacityNum" value="60" min="0" max="100" />
+                <input type="range" class="range" id="subBoxOpacity" min="0" max="100" value="75" />
+                <input type="number" id="subBoxOpacityNum" value="75" min="0" max="100" />
               </div>
             </label>
           </div>
