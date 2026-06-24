@@ -61,9 +61,9 @@ Cara termudah untuk end user — **tanpa Node.js, tanpa build manual**.
 
 | File | Platform | Keterangan |
 |------|----------|------------|
-| `DubClean Setup 1.1.0.exe` | Windows | Installer NSIS — disarankan |
-| `DubClean 1.1.0.exe` | Windows | Portable, tanpa install |
-| `DubClean-1.1.0.AppImage` | Linux | Jalankan langsung, tanpa install |
+| `DubClean Setup 1.2.0.exe` | Windows | Installer NSIS — disarankan |
+| `DubClean 1.2.0.exe` | Windows | Portable, tanpa install |
+| `DubClean-1.2.0.AppImage` | Linux | Jalankan langsung, tanpa install |
 
 3. Lanjut ke langkah install di bawah sesuai file yang kamu download.
 
@@ -75,7 +75,7 @@ Cara termudah untuk end user — **tanpa Node.js, tanpa build manual**.
 
 Untuk pemakaian harian — app masuk Start Menu & bisa bikin shortcut desktop.
 
-1. Download **`DubClean Setup 1.1.0.exe`** dari [Releases](https://github.com/OverHzn/DubClean/releases)
+1. Download **`DubClean Setup 1.2.0.exe`** dari [Releases](https://github.com/OverHzn/DubClean/releases)
 2. Double-click file installer
 3. Kalau Windows SmartScreen muncul → klik **More info** → **Run anyway** (app belum di-sign)
 4. Pilih folder install (default: `C:\Users\<nama>\AppData\Local\Programs\DubClean`)
@@ -96,7 +96,7 @@ Untuk pemakaian harian — app masuk Start Menu & bisa bikin shortcut desktop.
 
 Cocok kalau mau jalanin dari USB / folder tanpa jejak di sistem.
 
-1. Download **`DubClean 1.1.0.exe`** dari [Releases](https://github.com/OverHzn/DubClean/releases)
+1. Download **`DubClean 1.2.0.exe`** dari [Releases](https://github.com/OverHzn/DubClean/releases)
 2. Pindahkan file ke folder mana saja (misal `D:\Tools\DubClean\`)
 3. Double-click langsung — **tidak perlu install**
 4. Bisa buat shortcut manual: klik kanan file → **Create shortcut**
@@ -107,17 +107,17 @@ Cocok kalau mau jalanin dari USB / folder tanpa jejak di sistem.
 
 ### Opsi 4 — Linux (AppImage)
 
-1. Download **`DubClean-1.1.0.AppImage`** dari [Releases](https://github.com/OverHzn/DubClean/releases)
+1. Download **`DubClean-1.2.0.AppImage`** dari [Releases](https://github.com/OverHzn/DubClean/releases)
 2. Beri permission execute:
 
 ```bash
-chmod +x DubClean-1.1.0.AppImage
+chmod +x DubClean-1.2.0.AppImage
 ```
 
 3. Jalankan:
 
 ```bash
-./DubClean-1.1.0.AppImage
+./DubClean-1.2.0.AppImage
 ```
 
 Opsional — integrasi ke menu aplikasi:
@@ -175,14 +175,14 @@ npm run build:win
 
 | File | Kegunaan |
 |------|----------|
-| `dist\DubClean Setup 1.1.0.exe` | Installer NSIS (~99 MB) |
-| `dist\DubClean 1.1.0.exe` | Portable, tanpa install |
+| `dist\DubClean Setup 1.2.0.exe` | Installer NSIS (~99 MB) |
+| `dist\DubClean 1.2.0.exe` | Portable, tanpa install |
 | `dist\win-unpacked\DubClean.exe` | Versi unpacked (debug) |
 
 **Linux:**
 
 ```bash
-npm run build:linux    # → dist/DubClean-1.1.0.AppImage
+npm run build:linux    # → dist/DubClean-1.2.0.AppImage
 ```
 
 Installer memakai custom icon dari `build/icon.ico` / `build/icon.png` (bukan icon Electron default).
@@ -309,7 +309,7 @@ DubClean/
 | `npm start` → `EBUSY` | Tutup app Electron lain, atau `npm run start:direct` |
 | Project di OneDrive | Pindah ke `C:\Dev\DubClean` kalau file sering terkunci |
 | Build gagal / `dist/` kosong | Pastikan `npm install` sukses; jalankan `npm run build:win` lagi |
-| AppImage tidak execute (Linux) | `chmod +x DubClean-1.1.0.AppImage` |
+| AppImage tidak execute (Linux) | `chmod +x DubClean-1.2.0.AppImage` |
 | Render gagal | Pastikan video path valid, folder output ada, cek error di UI |
 | Watermark masih kelihatan | Perbesar box atau naikkan intensitas blur |
 

@@ -63,6 +63,12 @@ const timeDuration = document.getElementById('timeDuration');
 const btnEditMode = document.getElementById('btnEditMode');
 const editModeLabel = document.getElementById('editModeLabel');
 const toggleShowBlur = document.getElementById('toggleShowBlur');
+const previewStatusBadge = document.getElementById('previewStatusBadge');
+const exportResInfo = document.getElementById('exportResInfo');
+const exportPreviewDur = document.getElementById('exportPreviewDur');
+const exportAspectInfo = document.getElementById('exportAspectInfo');
+const renderLog = document.getElementById('renderLog');
+const progressLabel = document.getElementById('progressLabel');
 
 // ── Preview status ───────────────────────────────────────────────
 
@@ -90,29 +96,80 @@ function updateRenderButtons() {
   previewWarning.classList.toggle('hidden', previewStatus === 'ready' || !hasVideo);
 
   const statusLabels = {
-    missing: 'Belum ada preview — klik Preview Hasil dulu',
-    ready: 'Preview siap — cocokkan dengan pengaturan sebelum render penuh',
-    outdated: 'Preview kedaluwarsa — generate ulang sebelum render penuh',
-    rendering: 'Sedang membuat preview...',
+    missing: 'Belum ada preview. Klik Preview Hasil sebelum render final.',
+    ready: 'Preview sesuai pengaturan saat ini. Lanjut ke Render Video Final.',
+    outdated: 'Pengaturan berubah. Generate ulang preview.',
+    rendering: 'Memproses preview FFmpeg...',
   };
   if (previewStatusText) {
     previewStatusText.textContent = statusLabels[previewStatus] || '';
+  }
+
+  const badgeLabels = {
+    missing: 'belum ada',
+    ready: 'siap',
+    outdated: 'kedaluwarsa',
+    rendering: 'memproses',
+  };
+  if (previewStatusBadge) {
+    previewStatusBadge.textContent = badgeLabels[previewStatus] || '—';
+    previewStatusBadge.className = `status-badge ${previewStatus}`;
   }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
 
 function setRenderResult(message, type = '') {
+  if (!message) {
+    renderResult.classList.add('hidden');
+    renderResult.textContent = '';
+    return;
+  }
+  renderResult.classList.remove('hidden');
   renderResult.textContent = message;
   renderResult.className = 'render-result';
   if (type) renderResult.classList.add(type);
 }
 
+function appendRenderLog(line) {
+  if (!renderLog) return;
+  const ts = new Date().toLocaleTimeString('id-ID', { hour12: false });
+  renderLog.textContent += `[${ts}] ${line}\n`;
+  renderLog.scrollTop = renderLog.scrollHeight;
+}
+
+function logRenderConfigSummary(config, mode) {
+  if (!config) return;
+  appendRenderLog(`── ${mode} ──`);
+  appendRenderLog(`video ${config.videoWidth}×${config.videoHeight} · ${config.aspectClass} · AR ${config.aspectRatio.toFixed(3)}`);
+  appendRenderLog(`subtitle ${config.subtitleFontSizePx}px · stroke ${config.subtitleStrokeWidthPx}px · margin btm ${config.subtitleBottomMargin}px`);
+  appendRenderLog(`safe X=${config.subtitleSafeMarginX} · maxW=${config.subtitleMaxWidth}px`);
+  if (config.blurEnabled) {
+    config.blurRegions.forEach((b, i) => {
+      appendRenderLog(`blur[${i}] ${(b.xPercent * 100).toFixed(1)}%,${(b.yPercent * 100).toFixed(1)}% → ${b.x},${b.y} ${b.width}×${b.height}px`);
+    });
+  }
+}
+
+function updateExportMeta(meta, previewDur = null) {
+  if (!meta) {
+    if (exportResInfo) exportResInfo.textContent = '—';
+    if (exportAspectInfo) exportAspectInfo.textContent = '—';
+    if (exportPreviewDur) exportPreviewDur.textContent = '—';
+    return;
+  }
+  if (exportResInfo) exportResInfo.textContent = `${meta.width}×${meta.height}`;
+  if (exportAspectInfo) {
+    const cls = RM.classifyAspectRatio(meta.width, meta.height);
+    exportAspectInfo.textContent = `${cls} (${(meta.width / meta.height).toFixed(2)})`;
+  }
+  if (exportPreviewDur && previewDur != null) {
+    exportPreviewDur.textContent = `${previewDur.toFixed(1)}s`;
+  }
+}
+
 function updateOutputPath(folder) {
-  outputInfo.innerHTML = `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-    <span>${folder ? folder : 'Default: <code>Documents/DubClean/output/</code>'}</span>
-  `;
+  outputInfo.textContent = folder || 'Default: Documents/DubClean/output/';
 }
 
 function updateVideoMetaPills(name, meta) {
@@ -127,8 +184,9 @@ function updateVideoMetaPills(name, meta) {
     <span class="meta-pill">${meta.width}×${meta.height}</span>
     <span class="meta-pill">${arClass}</span>
     <span class="meta-pill">${dur}</span>
-    <span class="meta-pill ${meta.hasAudio ? 'success' : 'warn'}">${meta.hasAudio ? 'Audio ada' : 'Tanpa audio'}</span>
+    <span class="meta-pill ${meta.hasAudio ? 'success' : 'warn'}">${meta.hasAudio ? 'audio' : 'no audio'}</span>
   `;
+  updateExportMeta(meta);
 }
 
 function updateBlurBadge() {
@@ -228,6 +286,10 @@ function buildRenderPayload() {
   return payload;
 }
 
+function getRenderConfig() {
+  return RM.buildRenderConfig(buildRenderPayload());
+}
+
 function applyDynamicSubtitleDefaults(meta) {
   const defaults = RM.getDefaultSubtitleUiValues(meta.width, meta.height);
   document.getElementById('subFontSize').value = defaults.font_size;
@@ -279,7 +341,7 @@ function setEditMode(enabled) {
   editMode = enabled;
   canvas.classList.toggle('edit-mode', editMode);
   btnEditMode.classList.toggle('active', editMode);
-  editModeLabel.textContent = editMode ? 'Mode Edit' : 'Mode Putar';
+  editModeLabel.textContent = editMode ? 'Edit Blur' : 'Putar';
   canvasHint.classList.toggle('hidden', !editMode || !videoMeta);
 }
 
@@ -411,21 +473,21 @@ function drawCanvas() {
     const r = getBoxCanvasRect(region);
     const isSelected = i === selectedBoxIndex;
 
-    ctx.strokeStyle = isSelected ? '#7c6cf0' : '#fbbf24';
-    ctx.lineWidth = isSelected ? 2.5 : 1.5;
-    ctx.setLineDash(isSelected ? [] : [6, 4]);
+    ctx.strokeStyle = isSelected ? '#4a8fd4' : '#b8963e';
+    ctx.lineWidth = isSelected ? 2 : 1;
+    ctx.setLineDash(isSelected ? [] : [4, 3]);
     ctx.strokeRect(r.x, r.y, r.w, r.h);
     ctx.setLineDash([]);
 
-    ctx.fillStyle = isSelected ? 'rgba(124, 108, 240, 0.15)' : 'rgba(251, 191, 36, 0.1)';
+    ctx.fillStyle = isSelected ? 'rgba(74, 143, 212, 0.1)' : 'rgba(184, 150, 62, 0.08)';
     ctx.fillRect(r.x, r.y, r.w, r.h);
 
     if (isSelected) {
       drawHandles(r);
     }
 
-    ctx.fillStyle = isSelected ? '#9d8ff7' : '#fbbf24';
-    ctx.font = '11px Segoe UI';
+    ctx.fillStyle = isSelected ? '#4a8fd4' : '#b8963e';
+    ctx.font = '10px Consolas, monospace';
     ctx.fillText(`#${i + 1}`, r.x + 4, r.y + 14);
   });
 }
@@ -437,7 +499,7 @@ function drawHandles(r) {
     { x: r.x, y: r.y + r.h, handle: 'sw' },
     { x: r.x + r.w, y: r.y + r.h, handle: 'se' },
   ];
-  ctx.fillStyle = '#7c6cf0';
+  ctx.fillStyle = '#4a8fd4';
   corners.forEach((c) => {
     ctx.fillRect(c.x - HANDLE_SIZE / 2, c.y - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
   });
@@ -516,7 +578,7 @@ canvas.addEventListener('mousemove', (e) => {
 
   if (isDrawing) {
     drawCanvas();
-    ctx.strokeStyle = '#6c8cff';
+    ctx.strokeStyle = '#4a8fd4';
     ctx.lineWidth = 2;
     ctx.setLineDash([4, 4]);
     const w = mx - drawStart.x;
@@ -617,7 +679,7 @@ function renderBlurList() {
       <div class="box-item-header">
         <div class="box-item-title">
           <span class="box-num">${i + 1}</span>
-          Blur Region
+          Area Blur
         </div>
         <button class="btn btn-danger" data-action="delete" data-index="${i}">Hapus</button>
       </div>
@@ -724,8 +786,8 @@ function renderSrtList() {
   });
 
   srtInfo.textContent = cues.length
-    ? `${cues.length} cue siap di-burn ke video`
-    : 'Belum ada SRT — import dari toolbar atas';
+    ? `${cues.length} cue · burn-in via ASS`
+    : 'Belum ada SRT';
   updateEmptyStates();
 }
 
@@ -734,7 +796,9 @@ function renderSrtList() {
 async function loadVideo(path) {
   videoPath = path;
   setRenderResult('');
+  if (renderLog) renderLog.textContent = '';
   setPreviewStatus('missing');
+  updateExportMeta(null);
   previewSection.classList.add('hidden');
   previewPlayer.removeAttribute('src');
   playerWrapper.classList.add('has-video');
@@ -763,7 +827,8 @@ async function loadVideo(path) {
     updateRenderButtons();
   } catch (err) {
     updateVideoMetaPills(null, null);
-    videoInfo.innerHTML = `<span class="meta-pill warn">Error: ${err}</span>`;
+    updateExportMeta(null);
+    videoInfo.innerHTML = `<span class="meta-pill warn">error: ${err}</span>`;
     updateRenderButtons();
     return;
   }
@@ -952,8 +1017,9 @@ document.getElementById('btnLoadPreset').addEventListener('click', async () => {
   if (style.text_color) document.getElementById('subTextColor').value = style.text_color;
   if (style.box_color) document.getElementById('subBoxColor').value = style.box_color;
   if (style.box_opacity != null) {
-    document.getElementById('subBoxOpacity').value = Math.round(style.box_opacity * 100);
-    document.getElementById('subBoxOpacityVal').textContent = `${Math.round(style.box_opacity * 100)}%`;
+    const op = Math.round(style.box_opacity * 100);
+    document.getElementById('subBoxOpacity').value = op;
+    document.getElementById('subBoxOpacityNum').value = op;
   }
   if (style.outline_width != null) document.getElementById('subOutlineWidth').value = style.outline_width;
   if (style.margin_bottom != null) document.getElementById('subMarginBottom').value = style.margin_bottom;
@@ -965,7 +1031,7 @@ document.getElementById('btnLoadPreset').addEventListener('click', async () => {
   if (audio.mode) document.getElementById('audioMode').value = audio.mode;
   if (audio.volume_percent != null) {
     document.getElementById('audioVolume').value = audio.volume_percent;
-    document.getElementById('audioVolumeVal').textContent = `${audio.volume_percent}%`;
+    document.getElementById('audioVolumeNum').value = audio.volume_percent;
   }
   if (audio.offset_seconds != null) document.getElementById('audioOffset').value = audio.offset_seconds;
   if (audio.fit_mode) document.getElementById('audioFitMode').value = audio.fit_mode;
@@ -989,17 +1055,24 @@ document.getElementById('subPosition').addEventListener('change', (e) => {
 
 [
   'subFontSize', 'subCustomY', 'subTextColor', 'subBoxColor',
-  'subOutlineWidth', 'subMarginBottom', 'subMaxWidth',
+  'subOutlineWidth', 'subMarginBottom', 'subMaxWidth', 'subBoxOpacityNum',
 ].forEach((id) => bindStyleChange(document.getElementById(id)));
 
-document.getElementById('subBoxOpacity').addEventListener('input', (e) => {
-  document.getElementById('subBoxOpacityVal').textContent = `${e.target.value}%`;
-  markPreviewOutdated();
-});
+function syncRangeToNum(rangeId, numId, onChange) {
+  const range = document.getElementById(rangeId);
+  const num = document.getElementById(numId);
+  range?.addEventListener('input', () => {
+    num.value = range.value;
+    onChange?.();
+  });
+  num?.addEventListener('change', () => {
+    range.value = num.value;
+    onChange?.();
+  });
+}
 
-document.getElementById('audioVolume').addEventListener('input', (e) => {
-  document.getElementById('audioVolumeVal').textContent = `${e.target.value}%`;
-});
+syncRangeToNum('subBoxOpacity', 'subBoxOpacityNum', markPreviewOutdated);
+syncRangeToNum('audioVolume', 'audioVolumeNum');
 
 document.getElementById('subTextColor').addEventListener('input', (e) => {
   document.getElementById('subTextColorVal').textContent = e.target.value;
@@ -1030,9 +1103,11 @@ btnPreview?.addEventListener('click', async () => {
 
   setPreviewStatus('rendering');
   progressWrap.classList.remove('hidden');
+  if (progressLabel) progressLabel.textContent = 'Preview FFmpeg';
   progressFill.style.width = '0%';
   progressText.textContent = '0%';
-  setRenderResult('Membuat preview...', 'info');
+  setRenderResult('Memproses preview...', 'info');
+  appendRenderLog('Mulai preview render');
 
   const previewRange = RM.computePreviewRange(
     video.currentTime,
@@ -1044,6 +1119,9 @@ btnPreview?.addEventListener('click', async () => {
     ...buildRenderPayload(),
     previewRange,
   };
+
+  logRenderConfigSummary(getRenderConfig(), 'preview');
+  appendRenderLog(`range start=${previewRange.start.toFixed(2)}s dur=${previewRange.duration.toFixed(2)}s`);
 
   setupProgressListener('preview');
 
@@ -1058,11 +1136,14 @@ btnPreview?.addEventListener('click', async () => {
     previewPlayer.play().catch(() => {});
 
     setPreviewStatus('ready');
-    setRenderResult(`Preview siap (${previewRange.duration.toFixed(1)}s dari ${formatClock(previewRange.start)})`, 'success');
+    updateExportMeta(videoMeta, previewRange.duration);
+    appendRenderLog(`Preview selesai: ${result.outputPath || 'ok'}`);
+    setRenderResult(`Preview ${previewRange.duration.toFixed(1)}s @ ${formatClock(previewRange.start)}`, 'success');
     document.querySelector('.tab[data-tab="export"]')?.click();
   } catch (err) {
     setPreviewStatus('missing');
-    setRenderResult(`Preview error: ${err}`, 'error');
+    appendRenderLog(`Preview gagal: ${err}`);
+    setRenderResult(`Preview gagal: ${err}`, 'error');
   } finally {
     if (removeProgressListener) {
       removeProgressListener();
@@ -1076,9 +1157,12 @@ btnRender.addEventListener('click', async () => {
 
   btnRender.disabled = true;
   progressWrap.classList.remove('hidden');
+  if (progressLabel) progressLabel.textContent = 'Render final';
   progressFill.style.width = '0%';
   progressText.textContent = '0%';
-  setRenderResult('Rendering video...', 'info');
+  setRenderResult('Memproses render final...', 'info');
+  appendRenderLog('Mulai render final');
+  logRenderConfigSummary(getRenderConfig(), 'final');
 
   setupProgressListener('full');
 
@@ -1088,10 +1172,12 @@ btnRender.addEventListener('click', async () => {
     const result = await window.api.startRender(payload);
     progressFill.style.width = '100%';
     progressText.textContent = '100%';
-    setRenderResult(`Selesai! ${result.outputPath}`, 'success');
+    appendRenderLog(`Render selesai: ${result.outputPath}`);
+    setRenderResult(`Output: ${result.outputPath}`, 'success');
     document.querySelector('.tab[data-tab="export"]')?.click();
   } catch (err) {
-    setRenderResult(`Error: ${err}`, 'error');
+    appendRenderLog(`Render gagal: ${err}`);
+    setRenderResult(`Render gagal: ${err}`, 'error');
   } finally {
     updateRenderButtons();
     if (removeProgressListener) {

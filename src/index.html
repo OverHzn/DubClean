@@ -10,41 +10,19 @@
 <body>
   <header class="app-header">
     <div class="brand">
-      <div class="brand-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="2" y="4" width="20" height="16" rx="3"/>
-          <path d="M10 9v6M8 12h4"/>
-          <circle cx="17" cy="12" r="2"/>
-        </svg>
-      </div>
-      <div>
-        <h1>DubClean</h1>
-        <p class="brand-tag">Video cleanup untuk konten translate · <span id="appVersion">v1.1.0</span></p>
-      </div>
+      <h1>DubClean <span class="brand-tag" id="appVersion">v1.2.0</span></h1>
     </div>
     <div class="header-actions">
-      <button id="btnSavePreset" class="btn btn-ghost btn-icon" title="Simpan Preset">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        <span>Simpan</span>
-      </button>
-      <button id="btnLoadPreset" class="btn btn-ghost btn-icon" title="Load Preset">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span>Load</span>
-      </button>
+      <button id="btnSavePreset" class="btn btn-ghost" title="Simpan preset ke file JSON">Simpan Preset</button>
+      <button id="btnLoadPreset" class="btn btn-ghost" title="Muat preset dari file JSON">Load Preset</button>
     </div>
   </header>
 
   <main class="app-main">
     <section class="workspace">
       <div class="workspace-toolbar">
-        <button id="btnOpenVideo" class="btn btn-primary btn-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Buka Video
-        </button>
-        <button id="btnOpenSrt" class="btn btn-ghost btn-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
-          Import SRT
-        </button>
+        <button id="btnOpenVideo" class="btn btn-primary">Buka Video</button>
+        <button id="btnOpenSrt" class="btn btn-outline">Import SRT</button>
         <div class="toolbar-divider"></div>
         <div id="videoInfo" class="video-meta">
           <span class="meta-pill idle">Belum ada video</span>
@@ -53,28 +31,21 @@
 
       <div id="playerWrapper" class="player-wrapper">
         <div id="emptyState" class="empty-state">
-          <div class="empty-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-          </div>
-          <h3>Drop video di sini</h3>
-          <p>atau klik <strong>Buka Video</strong> — mp4, mov, mkv</p>
+          <h3>Drop file video</h3>
+          <p>mp4 · mov · mkv — atau gunakan <strong>Buka Video</strong></p>
         </div>
         <div id="playerStage" class="player-stage hidden">
           <video id="videoPlayer" playsinline preload="metadata"></video>
           <canvas id="overlayCanvas"></canvas>
           <div id="canvasHint" class="canvas-hint hidden">
-            <span>Space = putar/jeda · E = mode edit · drag gambar blur box</span>
+            Space = putar/jeda · E = edit area blur · drag untuk gambar kotak
           </div>
           <button id="btnFullscreen" class="btn-fullscreen" type="button" title="Fullscreen (F)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
           </button>
         </div>
         <div id="transportBar" class="transport-bar hidden">
-          <div id="playStatus" class="play-status" title="Tekan Space untuk putar / jeda">
+          <div id="playStatus" class="play-status" title="Space = putar / jeda">
             <svg id="iconPlay" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             <svg id="iconPause" class="hidden" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
             <span class="play-status-key">Space</span>
@@ -82,9 +53,8 @@
           <span id="timeCurrent" class="transport-time">00:00</span>
           <input type="range" id="seekBar" class="transport-seek" min="0" max="1000" value="0" step="1" />
           <span id="timeDuration" class="transport-time">00:00</span>
-          <button id="btnEditMode" class="btn-transport btn-edit-mode" type="button" title="Toggle mode edit blur box (E)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-            <span id="editModeLabel">Mode Putar</span>
+          <button id="btnEditMode" class="btn-transport btn-edit-mode" type="button" title="Toggle edit area blur (E)">
+            <span id="editModeLabel">Putar</span>
           </button>
         </div>
       </div>
@@ -93,47 +63,33 @@
     <aside class="sidebar">
       <nav class="sidebar-tabs" role="tablist">
         <button class="tab active" data-tab="blur" role="tab" aria-selected="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-          Blur
-          <span id="blurCount" class="tab-badge">0</span>
+          Blur <span id="blurCount" class="tab-badge">0</span>
         </button>
-        <button class="tab" data-tab="subtitle" role="tab">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="6" y1="16" x2="14" y2="16"/></svg>
-          Subtitle
-        </button>
-        <button class="tab" data-tab="audio" role="tab">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          Audio
-        </button>
-        <button class="tab" data-tab="export" role="tab">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Export
-        </button>
+        <button class="tab" data-tab="subtitle" role="tab">Subtitle</button>
+        <button class="tab" data-tab="audio" role="tab">Audio</button>
+        <button class="tab" data-tab="export" role="tab">Export</button>
       </nav>
 
       <div class="sidebar-content">
-        <!-- BLUR TAB -->
+        <!-- BLUR -->
         <section id="tab-blur" class="tab-panel active" role="tabpanel">
           <div class="panel-head">
-            <h2>Blur Regions</h2>
-            <p class="panel-desc">Nutup watermark atau teks asli di video</p>
-          </div>
-          <div id="blurBoxList" class="item-list"></div>
-          <div id="blurEmpty" class="panel-empty">
-            <p>Belum ada blur box</p>
-            <span>Gambar di preview video atau tambah manual</span>
+            <h2>Area Blur</h2>
+            <p class="panel-desc">Tutup watermark atau teks asli. Koordinat disimpan sebagai % resolusi video.</p>
           </div>
           <label class="toggle-field">
             <input type="checkbox" id="toggleShowBlur" checked />
-            <span>Tampilkan Area Blur</span>
+            <span>Tampilkan Area Blur di preview</span>
           </label>
-          <button id="btnAddBox" class="btn btn-outline btn-block">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Tambah Box
-          </button>
+          <div id="blurBoxList" class="item-list"></div>
+          <div id="blurEmpty" class="panel-empty">
+            <p>Belum ada area blur</p>
+            <span>Gambar kotak di preview atau tambah manual</span>
+          </div>
+          <button id="btnAddBox" class="btn btn-outline btn-block">Tambah Area</button>
         </section>
 
-        <!-- SUBTITLE TAB -->
+        <!-- SUBTITLE -->
         <section id="tab-subtitle" class="tab-panel" role="tabpanel">
           <div class="panel-head">
             <h2>Subtitle SRT</h2>
@@ -141,19 +97,17 @@
           </div>
           <div id="srtList" class="cue-list"></div>
           <div id="srtEmpty" class="panel-empty">
-            <p>Belum ada subtitle</p>
-            <span>Import file .srt dari toolbar atas</span>
+            <p>Belum ada cue</p>
+            <span>Import file .srt dari toolbar</span>
           </div>
 
-          <div class="panel-head" style="margin-top: 20px">
-            <h2>Style</h2>
-          </div>
+          <div class="section-label">Posisi Subtitle</div>
           <div class="form-grid">
             <label class="field">
               <span>Posisi</span>
               <select id="subPosition">
-                <option value="bottom">Bawah</option>
-                <option value="top">Atas</option>
+                <option value="bottom">Bawah tengah</option>
+                <option value="top">Atas tengah</option>
                 <option value="center">Tengah</option>
                 <option value="custom">Custom Y</option>
               </select>
@@ -163,9 +117,29 @@
               <input type="number" id="subCustomY" value="85" min="5" max="95" step="0.5" />
             </label>
             <label class="field">
-              <span>Ukuran Font</span>
+              <span>Ukuran Font (px)</span>
               <input type="number" id="subFontSize" value="42" min="12" max="120" />
             </label>
+            <label class="field">
+              <span>Outline (px)</span>
+              <input type="number" id="subOutlineWidth" value="2" min="0" max="10" />
+            </label>
+          </div>
+
+          <div class="section-label">Safe Area</div>
+          <div class="form-grid">
+            <label class="field">
+              <span>Margin Bawah (px)</span>
+              <input type="number" id="subMarginBottom" value="120" min="0" />
+            </label>
+            <label class="field">
+              <span>Max Lebar (%)</span>
+              <input type="number" id="subMaxWidth" value="80" min="30" max="100" />
+            </label>
+          </div>
+
+          <div class="section-label">Warna &amp; Box</div>
+          <div class="form-grid">
             <label class="field">
               <span>Warna Teks</span>
               <div class="color-field">
@@ -181,35 +155,23 @@
               </div>
             </label>
             <label class="field field-full">
-              <span>Opacity Box — <strong id="subBoxOpacityVal">60%</strong></span>
-              <input type="range" class="range" id="subBoxOpacity" min="0" max="100" value="60" />
-            </label>
-            <label class="field">
-              <span>Outline</span>
-              <input type="number" id="subOutlineWidth" value="2" min="0" max="10" />
-            </label>
-            <label class="field">
-              <span>Margin Bawah</span>
-              <input type="number" id="subMarginBottom" value="120" min="0" />
-            </label>
-            <label class="field">
-              <span>Max Lebar (%)</span>
-              <input type="number" id="subMaxWidth" value="80" min="30" max="100" />
+              <span>Opacity Box</span>
+              <div class="field-range-row">
+                <input type="range" class="range" id="subBoxOpacity" min="0" max="100" value="60" />
+                <input type="number" id="subBoxOpacityNum" value="60" min="0" max="100" />
+              </div>
             </label>
           </div>
         </section>
 
-        <!-- AUDIO TAB -->
+        <!-- AUDIO -->
         <section id="tab-audio" class="tab-panel" role="tabpanel">
           <div class="panel-head">
             <h2>Audio Track</h2>
             <p id="audioInfo" class="panel-desc">Belum ada audio baru</p>
           </div>
-          <button id="btnOpenAudio" class="btn btn-outline btn-block">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-            Import Audio
-          </button>
-          <div class="form-grid" style="margin-top: 16px">
+          <button id="btnOpenAudio" class="btn btn-outline btn-block">Import Audio</button>
+          <div class="form-grid" style="margin-top: 10px">
             <label class="field field-full">
               <span>Mode</span>
               <select id="audioMode">
@@ -218,8 +180,11 @@
               </select>
             </label>
             <label class="field field-full">
-              <span>Volume — <strong id="audioVolumeVal">100%</strong></span>
-              <input type="range" class="range" id="audioVolume" min="0" max="200" value="100" />
+              <span>Volume (%)</span>
+              <div class="field-range-row">
+                <input type="range" class="range" id="audioVolume" min="0" max="200" value="100" />
+                <input type="number" id="audioVolumeNum" value="100" min="0" max="200" />
+              </div>
             </label>
             <label class="field">
               <span>Offset (detik)</span>
@@ -235,53 +200,66 @@
           </div>
         </section>
 
-        <!-- EXPORT TAB -->
+        <!-- EXPORT -->
         <section id="tab-export" class="tab-panel" role="tabpanel">
           <div class="panel-head">
-            <h2>Output</h2>
-            <p class="panel-desc">Hasil render disimpan sebagai <code>{nama}_clean.mp4</code></p>
+            <h2>Export</h2>
+            <p class="panel-desc">Output: <code>{nama}_clean.mp4</code></p>
           </div>
-          <button id="btnChooseOutput" class="btn btn-outline btn-block">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            Pilih Folder Output
-          </button>
-          <div id="outputInfo" class="output-path">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            <span>Default: <code>Documents/DubClean/output/</code></span>
-          </div>
-          <div id="previewSection" class="preview-section hidden">
-            <div class="panel-head" style="margin-top: 16px">
-              <h2>Preview Hasil</h2>
-              <p id="previewStatusText" class="panel-desc">Preview siap — cocokkan dengan pengaturan sebelum render penuh</p>
+
+          <div class="status-row">
+            <div class="status-item">
+              <span class="status-label">Status Preview</span>
+              <span class="status-value"><span id="previewStatusBadge" class="status-badge missing">belum ada</span></span>
             </div>
+            <div class="status-item">
+              <span class="status-label">Resolusi Video</span>
+              <span class="status-value" id="exportResInfo">—</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Durasi Preview</span>
+              <span class="status-value" id="exportPreviewDur">—</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Aspect Ratio</span>
+              <span class="status-value" id="exportAspectInfo">—</span>
+            </div>
+          </div>
+
+          <button id="btnChooseOutput" class="btn btn-outline btn-block">Pilih Folder Output</button>
+          <div id="outputInfo" class="output-path">Default: Documents/DubClean/output/</div>
+
+          <div id="previewSection" class="preview-section hidden">
+            <div class="section-label">Preview Hasil</div>
+            <p id="previewStatusText" class="panel-desc">Generate preview sebelum render final.</p>
             <div class="preview-player-wrap">
               <video id="previewPlayer" playsinline controls></video>
             </div>
           </div>
-          <div id="renderResult" class="render-result"></div>
+
+          <div id="renderResult" class="render-result hidden"></div>
+
+          <details class="render-log-panel" id="renderLogPanel">
+            <summary>Log Render</summary>
+            <pre id="renderLog" class="render-log"></pre>
+          </details>
         </section>
       </div>
 
       <footer class="sidebar-footer">
         <div class="progress-wrap hidden" id="progressWrap">
           <div class="progress-header">
-            <span>Rendering...</span>
+            <span id="progressLabel">Memproses...</span>
             <span id="progressText">0%</span>
           </div>
           <div class="progress-bar">
             <div class="progress-fill" id="progressFill"></div>
           </div>
         </div>
-        <p id="previewWarning" class="preview-warning hidden">Preview belum diperbarui. Klik Preview Hasil sebelum Render Video.</p>
+        <p id="previewWarning" class="preview-warning hidden">Preview belum diperbarui. Klik Preview Hasil sebelum Render Video Final.</p>
         <div class="render-actions">
-          <button id="btnPreview" class="btn btn-preview" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/><circle cx="12" cy="12" r="3"/></svg>
-            Preview Hasil
-          </button>
-          <button id="btnRender" class="btn btn-render" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Render Video
-          </button>
+          <button id="btnPreview" class="btn btn-preview" disabled>Preview Hasil</button>
+          <button id="btnRender" class="btn btn-render" disabled>Render Video Final</button>
         </div>
       </footer>
     </aside>
