@@ -19,7 +19,7 @@
       </div>
       <div>
         <h1>DubClean</h1>
-        <p class="brand-tag">Video cleanup untuk konten translate</p>
+        <p class="brand-tag">Video cleanup untuk konten translate · <span id="appVersion">v1.1.0</span></p>
       </div>
     </div>
     <div class="header-actions">
@@ -123,6 +123,10 @@
             <p>Belum ada blur box</p>
             <span>Gambar di preview video atau tambah manual</span>
           </div>
+          <label class="toggle-field">
+            <input type="checkbox" id="toggleShowBlur" checked />
+            <span>Tampilkan Area Blur</span>
+          </label>
           <button id="btnAddBox" class="btn btn-outline btn-block">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Tambah Box
@@ -155,8 +159,8 @@
               </select>
             </label>
             <label id="customYRow" class="field hidden">
-              <span>Custom Y (px)</span>
-              <input type="number" id="subCustomY" value="900" min="0" />
+              <span>Custom Y (% tinggi)</span>
+              <input type="number" id="subCustomY" value="85" min="5" max="95" step="0.5" />
             </label>
             <label class="field">
               <span>Ukuran Font</span>
@@ -245,6 +249,15 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
             <span>Default: <code>Documents/DubClean/output/</code></span>
           </div>
+          <div id="previewSection" class="preview-section hidden">
+            <div class="panel-head" style="margin-top: 16px">
+              <h2>Preview Hasil</h2>
+              <p id="previewStatusText" class="panel-desc">Preview siap — cocokkan dengan pengaturan sebelum render penuh</p>
+            </div>
+            <div class="preview-player-wrap">
+              <video id="previewPlayer" playsinline controls></video>
+            </div>
+          </div>
           <div id="renderResult" class="render-result"></div>
         </section>
       </div>
@@ -259,14 +272,22 @@
             <div class="progress-fill" id="progressFill"></div>
           </div>
         </div>
-        <button id="btnRender" class="btn btn-render" disabled>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Render Video
-        </button>
+        <p id="previewWarning" class="preview-warning hidden">Preview belum diperbarui. Klik Preview Hasil sebelum Render Video.</p>
+        <div class="render-actions">
+          <button id="btnPreview" class="btn btn-preview" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/><circle cx="12" cy="12" r="3"/></svg>
+            Preview Hasil
+          </button>
+          <button id="btnRender" class="btn btn-render" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Render Video
+          </button>
+        </div>
       </footer>
     </aside>
   </main>
 
+  <script src="renderMath.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

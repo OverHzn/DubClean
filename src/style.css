@@ -830,6 +830,13 @@ body {
   letter-spacing: normal;
 }
 
+.box-px-hint {
+  grid-column: 1 / -1;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: -2px;
+}
+
 .box-blur-row {
   grid-column: 1 / -1;
 }
@@ -1069,15 +1076,35 @@ input[type="color"] {
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2,  1);
 }
 
+.render-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-preview,
 .btn-render {
-  width: 100%;
-  padding: 13px 20px;
-  font-size: 0.9rem;
+  flex: 1;
+  padding: 13px 12px;
+  font-size: 0.85rem;
   font-weight: 600;
-  background: linear-gradient(135deg, var(--success), #10b981);
   border: none;
-  color: #042f1a;
   border-radius: var(--radius);
+}
+
+.btn-preview {
+  background: linear-gradient(135deg, var(--accent), #5b4fd4);
+  color: #fff;
+  box-shadow: 0 2px 16px var(--accent-glow);
+}
+
+.btn-preview:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 4px 24px var(--accent-glow);
+}
+
+.btn-render {
+  background: linear-gradient(135deg, var(--success), #10b981);
+  color: #042f1a;
   box-shadow: 0 2px 16px var(--success-glow);
 }
 
@@ -1086,7 +1113,46 @@ input[type="color"] {
   box-shadow: 0 4px 24px var(--success-glow);
 }
 
+.btn-preview svg,
 .btn-render svg {
   width: 18px;
   height: 18px;
+}
+
+.preview-warning {
+  font-size: 0.72rem;
+  color: var(--warning);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.preview-section {
+  margin-top: 8px;
+}
+
+.preview-player-wrap {
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #000;
+}
+
+.preview-player-wrap video {
+  width: 100%;
+  display: block;
+  max-height: 240px;
+}
+
+.toggle-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.toggle-field input {
+  accent-color: var(--accent);
 }

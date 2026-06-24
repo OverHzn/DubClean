@@ -9,8 +9,10 @@ contextBridge.exposeInMainWorld('api', {
   loadPreset: () => ipcRenderer.invoke('dialog:loadPreset'),
   parseSrt: (content) => ipcRenderer.invoke('srt:parse', content),
   getVideoMeta: (path) => ipcRenderer.invoke('video:getMeta', path),
+  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   getVideoSrc: (path) => ipcRenderer.invoke('video:getSrc', path),
   startRender: (payload) => ipcRenderer.invoke('render:start', payload),
+  startPreviewRender: (payload) => ipcRenderer.invoke('render:preview', payload),
   onRenderProgress: (callback) => {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on('render:progress', handler);

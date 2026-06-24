@@ -5,10 +5,16 @@ const os = require('os');
 const { spawn } = require('child_process');
 const { pathToFileURL } = require('url');
 
-// Simpan cache/userData di luar OneDrive — hindari EBUSY & "Access denied" di folder sync
 app.setPath('userData', path.join(os.homedir(), 'AppData', 'Local', 'DubClean'));
 const ffmpeg = require('fluent-ffmpeg');
 const { parseSrt } = require('./srtParser');
+const { version: appVersion } = require('../package.json');
+const {
+  generateAss,
+  buildFullFilter,
+  logRenderConfig,
+  prepareRenderPayload,
+} = require('./renderConfig');
 
 function resolveBundledBinary(binaryPath) {
   if (!binaryPath) return null;
@@ -174,11 +180,15 @@ function probeVideoMeta(videoPath) {
           parseInt(durMatch[4], 10) / 100;
       }
 
+      const width = dimMatch ? parseInt(dimMatch[1], 10) : 0;
+      const height = dimMatch ? parseInt(dimMatch[2], 10) : 0;
+
       resolve({
-        width: dimMatch ? parseInt(dimMatch[1], 10) : 0,
-        height: dimMatch ? parseInt(dimMatch[2], 10) : 0,
+        width,
+        height,
         duration,
         hasAudio,
+        aspectRatio: width && height ? width / height : 0,
       });
     });
   });
@@ -188,176 +198,58 @@ ipcMain.handle('video:getMeta', (_event, videoPath) => probeVideoMeta(videoPath)
 
 ipcMain.handle('video:getSrc', (_event, videoPath) => pathToFileURL(videoPath).href);
 
-// ── ASS generator ────────────────────────────────────────────────
+ipcMain.handle('app:getVersion', () => appVersion);
 
-function hexToAssColor(hex, opacity = 1) {
-  const h = hex.replace('#', '');
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
-  const a = Math.round((1 - opacity) * 255);
-  const pad = (n) => n.toString(16).padStart(2, '0').toUpperCase();
-  return `&H${pad(a)}${pad(b)}${pad(g)}${pad(r)}`;
-}
+// ── Shared render pipeline ───────────────────────────────────────
 
-function secondsToAssTime(sec) {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = Math.floor(sec % 60);
-  const cs = Math.round((sec % 1) * 100);
-  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
-}
-
-function generateAss(cues, style, videoMeta) {
-  const s = style || {};
-  const font = s.font || 'Arial';
-  const fontSize = s.font_size || 42;
-  const primary = hexToAssColor(s.text_color || '#FFFFFF');
-  const outline = hexToAssColor(s.outline_color || '#000000');
-  const back = hexToAssColor(s.box_color || '#000000', s.box_opacity ?? 0.6);
-  const outlineWidth = s.outline_width ?? 2;
-  const marginV = s.margin_bottom ?? 120;
-  const marginL = 40;
-  const marginR = 40;
-
-  let alignment = 2; // bottom center
-  if (s.position === 'top') alignment = 8;
-  else if (s.position === 'center') alignment = 5;
-
-  const playResX = videoMeta?.width || 1080;
-  const playResY = videoMeta?.height || 1920;
-
-  const header = `[Script Info]
-Title: DubClean
-ScriptType: v4.00+
-PlayResX: ${playResX}
-PlayResY: ${playResY}
-WrapStyle: 0
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${font},${fontSize},${primary},&H000000FF,${outline},${back},-1,0,0,0,100,100,0,0,3,${outlineWidth},0,${alignment},${marginL},${marginR},${marginV},1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-`;
-
-  const lines = (cues || []).map((cue) => {
-    const start = secondsToAssTime(cue.start);
-    const end = secondsToAssTime(cue.end);
-    const text = (cue.text || '').replace(/\n/g, '\\N');
-    let prefix = '';
-    if (s.position === 'custom' && s.custom_y != null) {
-      const x = Math.round(playResX / 2);
-      const y = Math.round(s.custom_y);
-      prefix = `{\\pos(${x},${y})}`;
-    }
-    const maxW = s.max_width_percent ?? 80;
-    if (maxW < 100) {
-      prefix += `{\\q2}`;
-    }
-    return `Dialogue: 0,${start},${end},Default,,0,0,0,,${prefix}${text}`;
-  });
-
-  return header + lines.join('\n') + '\n';
-}
-
-// ── FFmpeg filter builders ───────────────────────────────────────
-
-function buildBlurChain(blurRegions) {
-  if (!blurRegions || blurRegions.length === 0) {
-    return { filter: null, lastLabel: '0:v' };
-  }
-
-  const parts = [];
-  let current = '0:v';
-
-  blurRegions.forEach((region, i) => {
-    const { x, y, width, height, blur_intensity, time_range } = region;
-    const intensity = Math.max(1, blur_intensity || 20);
-    const sigma = Math.max(1, Math.round(intensity / 3));
-    const blurLabel = `blur${i}`;
-    const outLabel = `v${i}`;
-
-    parts.push(
-      `[${current}]crop=${width}:${height}:${x}:${y},gblur=sigma=${sigma}:steps=1[${blurLabel}]`
-    );
-
-    let overlay = `[${current}][${blurLabel}]overlay=${x}:${y}`;
-    if (time_range && time_range.end != null && time_range.end !== '') {
-      const start = time_range.start || 0;
-      const end = time_range.end;
-      overlay += `:enable='between(t\\,${start}\\,${end})'`;
-    }
-    overlay += `[${outLabel}]`;
-    parts.push(overlay);
-    current = outLabel;
-  });
-
-  return { filter: parts.join(';'), lastLabel: current };
-}
-
-function escapeFfmpegPath(filePath) {
-  return filePath
-    .replace(/\\/g, '/')
-    .replace(/^([a-zA-Z]):/, '$1\\:')
-    .replace(/'/g, "'\\''");
-}
-
-function buildFullFilter(blurRegions, assPath, hasCues) {
-  const { filter: blurFilter, lastLabel } = buildBlurChain(blurRegions);
-  const escapedAss = escapeFfmpegPath(assPath);
-
-  let chain = blurFilter;
-  let videoOut = lastLabel;
-
-  if (hasCues) {
-    const subPart = `[${lastLabel}]subtitles='${escapedAss}'[outv]`;
-    chain = chain ? `${chain};${subPart}` : subPart;
-    videoOut = 'outv';
-  }
-
-  return { filterComplex: chain, videoOut };
-}
-
-// ── Render ───────────────────────────────────────────────────────
-
-ipcMain.handle('render:start', async (event, payload) => {
+function runFfmpegRender(event, payload, options = {}) {
   const {
     videoPath,
     outputFolder,
-    blurRegions,
-    cues,
-    subtitleStyle,
-    videoMeta,
     audioFile,
     audioSettings,
+    previewRange,
   } = payload;
+
+  const mode = options.mode || 'full';
+  const isPreview = mode === 'preview';
 
   if (!ffmpegPath || !fs.existsSync(ffmpegPath)) {
     throw new Error('ffmpeg tidak ditemukan — coba install ulang aplikasi');
   }
 
+  const { config, cues, blurRegions } = prepareRenderPayload(payload, {
+    mode,
+    previewRange,
+  });
+
   const outDir = outputFolder || getDefaultOutputDir();
-  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  if (!isPreview && !fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
   const base = path.basename(videoPath, path.extname(videoPath));
-  const outPath = path.join(outDir, `${base}_clean.mp4`);
+  const outPath = isPreview
+    ? path.join(os.tmpdir(), `dubclean_preview_${Date.now()}.mp4`)
+    : path.join(outDir, `${base}_clean.mp4`);
 
   const assPath = path.join(os.tmpdir(), `dubclean_${Date.now()}.ass`);
   const hasCues = cues && cues.length > 0;
 
   if (hasCues) {
-    fs.writeFileSync(assPath, generateAss(cues, subtitleStyle, videoMeta), 'utf-8');
+    fs.writeFileSync(assPath, generateAss(cues, config), 'utf-8');
   }
 
-  const { filterComplex, videoOut } = buildFullFilter(blurRegions, assPath, hasCues);
+  const { filterComplex, videoOut } = buildFullFilter(config, assPath, hasCues);
   const useComplex = filterComplex && (blurRegions?.length > 0 || hasCues);
 
   return new Promise((resolve, reject) => {
     const cmd = ffmpeg(videoPath);
 
-    const hasNewAudio = audioFile && audioSettings;
+    if (isPreview && previewRange) {
+      cmd.inputOptions(['-ss', String(previewRange.start)]);
+      cmd.duration(previewRange.duration);
+    }
+
+    const hasNewAudio = !isPreview && audioFile && audioSettings;
     if (hasNewAudio) {
       const inputOpts = [];
       if (audioSettings.fit_mode === 'loop') {
@@ -391,9 +283,13 @@ ipcMain.handle('render:start', async (event, payload) => {
       if (audioSettings.fit_mode === 'trim' || audioSettings.fit_mode === 'loop') {
         outputOpts.push('-shortest');
       }
+    } else if (!isPreview) {
+      outputOpts.push('-map', '0:a?');
+      outputOpts.push('-c:a', 'aac');
     } else {
       outputOpts.push('-map', '0:a?');
       outputOpts.push('-c:a', 'aac');
+      outputOpts.push('-shortest');
     }
 
     outputOpts.push('-c:v', 'libx264', '-crf', '18', '-preset', 'medium', '-pix_fmt', 'yuv420p');
@@ -402,16 +298,34 @@ ipcMain.handle('render:start', async (event, payload) => {
 
     cmd.outputOptions(outputOpts).output(outPath);
 
+    let ffmpegCommand = '';
+    cmd.on('start', (commandLine) => {
+      ffmpegCommand = commandLine;
+      logRenderConfig(config, mode, {
+        previewRange: isPreview ? previewRange : null,
+        ffmpegCommand: commandLine,
+      });
+    });
+
     cmd.on('progress', (progress) => {
       const pct = progress.percent ? Math.min(100, Math.round(progress.percent)) : 0;
-      event.sender.send('render:progress', { percent: pct, timemark: progress.timemark });
+      event.sender.send('render:progress', {
+        percent: pct,
+        timemark: progress.timemark,
+        mode,
+      });
     });
 
     cmd.on('end', () => {
       if (hasCues && fs.existsSync(assPath)) {
         try { fs.unlinkSync(assPath); } catch (_) { /* ignore */ }
       }
-      resolve({ success: true, outputPath: outPath });
+      resolve({
+        success: true,
+        outputPath: outPath,
+        previewSrc: pathToFileURL(outPath).href,
+        mode,
+      });
     });
 
     cmd.on('error', (err, _stdout, stderr) => {
@@ -424,4 +338,12 @@ ipcMain.handle('render:start', async (event, payload) => {
 
     cmd.run();
   });
-});
+}
+
+ipcMain.handle('render:start', (event, payload) =>
+  runFfmpegRender(event, payload, { mode: 'full' })
+);
+
+ipcMain.handle('render:preview', (event, payload) =>
+  runFfmpegRender(event, payload, { mode: 'preview' })
+);

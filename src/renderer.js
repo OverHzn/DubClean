@@ -1,5 +1,7 @@
 // ── State ────────────────────────────────────────────────────────
 
+const RM = window.RenderMath;
+
 let videoPath = null;
 let videoMeta = null;
 let blurRegions = [];
@@ -9,9 +11,10 @@ let outputFolder = null;
 let selectedBoxIndex = -1;
 let editMode = false;
 let isSeeking = false;
+let showBlurOverlay = true;
+let previewStatus = 'missing'; // missing | ready | outdated | rendering
 
-let scaleX = 1;
-let scaleY = 1;
+const HANDLE_SIZE = 8;
 
 // Canvas interaction
 let isDrawing = false;
@@ -21,8 +24,6 @@ let resizeHandle = null;
 let drawStart = { x: 0, y: 0 };
 let dragStart = { x: 0, y: 0 };
 let boxAtDragStart = null;
-
-const HANDLE_SIZE = 8;
 
 // ── DOM refs ─────────────────────────────────────────────────────
 
@@ -39,6 +40,11 @@ const srtList = document.getElementById('srtList');
 const outputInfo = document.getElementById('outputInfo');
 const audioInfo = document.getElementById('audioInfo');
 const btnRender = document.getElementById('btnRender');
+const btnPreview = document.getElementById('btnPreview');
+const previewWarning = document.getElementById('previewWarning');
+const previewSection = document.getElementById('previewSection');
+const previewPlayer = document.getElementById('previewPlayer');
+const previewStatusText = document.getElementById('previewStatusText');
 const progressWrap = document.getElementById('progressWrap');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
@@ -56,6 +62,43 @@ const timeCurrent = document.getElementById('timeCurrent');
 const timeDuration = document.getElementById('timeDuration');
 const btnEditMode = document.getElementById('btnEditMode');
 const editModeLabel = document.getElementById('editModeLabel');
+const toggleShowBlur = document.getElementById('toggleShowBlur');
+
+// ── Preview status ───────────────────────────────────────────────
+
+function setPreviewStatus(status) {
+  previewStatus = status;
+  updateRenderButtons();
+}
+
+function markPreviewOutdated() {
+  if (previewStatus === 'rendering') return;
+  if (previewStatus === 'ready') {
+    setPreviewStatus('outdated');
+  } else if (previewStatus !== 'missing') {
+    setPreviewStatus('outdated');
+  }
+}
+
+function updateRenderButtons() {
+  const hasVideo = !!videoPath && !!videoMeta;
+  btnPreview.disabled = !hasVideo || previewStatus === 'rendering';
+
+  const canRender = hasVideo && previewStatus === 'ready';
+  btnRender.disabled = !canRender;
+
+  previewWarning.classList.toggle('hidden', previewStatus === 'ready' || !hasVideo);
+
+  const statusLabels = {
+    missing: 'Belum ada preview — klik Preview Hasil dulu',
+    ready: 'Preview siap — cocokkan dengan pengaturan sebelum render penuh',
+    outdated: 'Preview kedaluwarsa — generate ulang sebelum render penuh',
+    rendering: 'Sedang membuat preview...',
+  };
+  if (previewStatusText) {
+    previewStatusText.textContent = statusLabels[previewStatus] || '';
+  }
+}
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -78,9 +121,11 @@ function updateVideoMetaPills(name, meta) {
     return;
   }
   const dur = `${Math.floor(meta.duration / 60)}:${String(Math.floor(meta.duration % 60)).padStart(2, '0')}`;
+  const arClass = RM.classifyAspectRatio(meta.width, meta.height);
   videoInfo.innerHTML = `
     <span class="meta-pill accent">${name}</span>
     <span class="meta-pill">${meta.width}×${meta.height}</span>
+    <span class="meta-pill">${arClass}</span>
     <span class="meta-pill">${dur}</span>
     <span class="meta-pill ${meta.hasAudio ? 'success' : 'warn'}">${meta.hasAudio ? 'Audio ada' : 'Tanpa audio'}</span>
   `;
@@ -133,7 +178,7 @@ function formatTime(sec) {
 function getSubtitleStyle() {
   return {
     position: document.getElementById('subPosition').value,
-    custom_y: parseInt(document.getElementById('subCustomY').value, 10) || 900,
+    custom_y_percent: parseFloat(document.getElementById('subCustomY').value) / 100 || 0.85,
     font: 'Arial',
     font_size: parseInt(document.getElementById('subFontSize').value, 10) || 42,
     text_color: document.getElementById('subTextColor').value,
@@ -153,6 +198,55 @@ function getAudioSettings() {
     offset_seconds: parseFloat(document.getElementById('audioOffset').value) || 0,
     fit_mode: document.getElementById('audioFitMode').value,
   };
+}
+
+function getDisplaySize() {
+  const rect = playerStage.getBoundingClientRect();
+  return {
+    displayWidth: Math.floor(rect.width) || 0,
+    displayHeight: Math.floor(rect.height) || 0,
+  };
+}
+
+function buildRenderPayload() {
+  const { displayWidth, displayHeight } = getDisplaySize();
+  const payload = {
+    videoPath,
+    outputFolder: outputFolder || null,
+    blurRegions,
+    cues,
+    subtitleStyle: getSubtitleStyle(),
+    videoMeta,
+    displayWidth,
+    displayHeight,
+    audioFile: audioFile || null,
+    audioSettings: audioFile ? getAudioSettings() : null,
+  };
+
+  const config = RM.buildRenderConfig(payload);
+  console.log('[Renderer] Render payload config:', config);
+  return payload;
+}
+
+function applyDynamicSubtitleDefaults(meta) {
+  const defaults = RM.getDefaultSubtitleUiValues(meta.width, meta.height);
+  document.getElementById('subFontSize').value = defaults.font_size;
+  document.getElementById('subMarginBottom').value = defaults.margin_bottom;
+  document.getElementById('subMaxWidth').value = defaults.max_width_percent;
+  document.getElementById('subOutlineWidth').value = defaults.outline_width;
+
+  const aspectClass = RM.classifyAspectRatio(meta.width, meta.height);
+  let bottomPercent = 90;
+  if (aspectClass === 'horizontal') bottomPercent = 92;
+  else if (aspectClass === 'square') bottomPercent = 91;
+  document.getElementById('subCustomY').value = bottomPercent;
+}
+
+function normalizeAllBlurRegions() {
+  if (!videoMeta) return;
+  blurRegions = blurRegions.map((r) =>
+    RM.normalizeBlurRegion(r, videoMeta.width, videoMeta.height)
+  );
 }
 
 function layoutPlayerStage() {
@@ -222,8 +316,6 @@ function updateScale() {
 
   canvas.width = w;
   canvas.height = h;
-  scaleX = videoMeta.width / w;
-  scaleY = videoMeta.height / h;
 }
 
 function getStageCoords(clientX, clientY) {
@@ -263,44 +355,57 @@ function refreshPlayerLayout() {
   drawCanvas();
 }
 
-function canvasToVideo(cx, cy) {
-  return {
-    x: Math.round(cx * scaleX),
-    y: Math.round(cy * scaleY),
-  };
-}
-
-function videoToCanvas(vx, vy) {
-  return { x: vx / scaleX, y: vy / scaleY };
-}
-
 function getBoxCanvasRect(region) {
-  const tl = videoToCanvas(region.x, region.y);
+  const norm = RM.normalizeBlurRegion(region, videoMeta?.width, videoMeta?.height);
+  const w = canvas.width;
+  const h = canvas.height;
   return {
-    x: tl.x,
-    y: tl.y,
-    w: region.width / scaleX,
-    h: region.height / scaleY,
+    x: norm.xPercent * w,
+    y: norm.yPercent * h,
+    w: norm.widthPercent * w,
+    h: norm.heightPercent * h,
   };
+}
+
+function clampRegionToBounds(region) {
+  if (!videoMeta) return region;
+  const norm = RM.normalizeBlurRegion(region, videoMeta.width, videoMeta.height);
+  norm.xPercent = RM.clamp(norm.xPercent, 0, 1 - norm.widthPercent);
+  norm.yPercent = RM.clamp(norm.yPercent, 0, 1 - norm.heightPercent);
+  norm.widthPercent = RM.clamp(norm.widthPercent, 10 / videoMeta.width, 1 - norm.xPercent);
+  norm.heightPercent = RM.clamp(norm.heightPercent, 10 / videoMeta.height, 1 - norm.yPercent);
+  return norm;
 }
 
 function defaultBox() {
-  const w = videoMeta ? Math.round(videoMeta.width * 0.15) : 150;
-  const h = videoMeta ? Math.round(videoMeta.height * 0.05) : 80;
   return {
-    x: 0,
-    y: 0,
-    width: w,
-    height: h,
+    xPercent: 0,
+    yPercent: 0,
+    widthPercent: 0.15,
+    heightPercent: 0.05,
     blur_intensity: 20,
     time_range: { start: 0, end: null },
   };
+}
+
+function regionFromCanvasRect(x, y, w, h) {
+  const cw = canvas.width;
+  const ch = canvas.height;
+  return clampRegionToBounds({
+    xPercent: x / cw,
+    yPercent: y / ch,
+    widthPercent: w / cw,
+    heightPercent: h / ch,
+    blur_intensity: 20,
+    time_range: { start: 0, end: null },
+  });
 }
 
 // ── Canvas drawing ───────────────────────────────────────────────
 
 function drawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!showBlurOverlay) return;
 
   blurRegions.forEach((region, i) => {
     const r = getBoxCanvasRect(region);
@@ -367,11 +472,14 @@ function endBoxInteraction() {
   isResizing = false;
   resizeHandle = null;
   boxAtDragStart = null;
-  if (needsSync) renderBlurList();
+  if (needsSync) {
+    renderBlurList();
+    markPreviewOutdated();
+  }
 }
 
 canvas.addEventListener('mousedown', (e) => {
-  if (!videoMeta || !editMode) return;
+  if (!videoMeta || !editMode || !showBlurOverlay) return;
   const { x: mx, y: my } = getStageCoords(e.clientX, e.clientY);
 
   const hit = hitTest(mx, my);
@@ -380,7 +488,7 @@ canvas.addEventListener('mousedown', (e) => {
     isResizing = true;
     resizeHandle = hit.handle;
     dragStart = { x: mx, y: my };
-    boxAtDragStart = { ...blurRegions[hit.index] };
+    boxAtDragStart = { ...RM.normalizeBlurRegion(blurRegions[hit.index], videoMeta.width, videoMeta.height) };
     renderBlurList();
     drawCanvas();
     return;
@@ -390,7 +498,7 @@ canvas.addEventListener('mousedown', (e) => {
     selectedBoxIndex = hit.index;
     isDragging = true;
     dragStart = { x: mx, y: my };
-    boxAtDragStart = { ...blurRegions[hit.index] };
+    boxAtDragStart = { ...RM.normalizeBlurRegion(blurRegions[hit.index], videoMeta.width, videoMeta.height) };
     renderBlurList();
     drawCanvas();
     return;
@@ -403,7 +511,7 @@ canvas.addEventListener('mousedown', (e) => {
 });
 
 canvas.addEventListener('mousemove', (e) => {
-  if (!videoMeta || !editMode) return;
+  if (!videoMeta || !editMode || !showBlurOverlay) return;
   const { x: mx, y: my } = getStageCoords(e.clientX, e.clientY);
 
   if (isDrawing) {
@@ -419,40 +527,40 @@ canvas.addEventListener('mousemove', (e) => {
   }
 
   if (isDragging && boxAtDragStart) {
-    const dx = (mx - dragStart.x) * scaleX;
-    const dy = (my - dragStart.y) * scaleY;
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const dx = (mx - dragStart.x) / cw;
+    const dy = (my - dragStart.y) / ch;
     const region = blurRegions[selectedBoxIndex];
-    region.x = Math.max(0, Math.round(boxAtDragStart.x + dx));
-    region.y = Math.max(0, Math.round(boxAtDragStart.y + dy));
-    if (videoMeta) {
-      region.x = Math.min(region.x, videoMeta.width - region.width);
-      region.y = Math.min(region.y, videoMeta.height - region.height);
-    }
+    region.xPercent = RM.clamp(boxAtDragStart.xPercent + dx, 0, 1 - boxAtDragStart.widthPercent);
+    region.yPercent = RM.clamp(boxAtDragStart.yPercent + dy, 0, 1 - boxAtDragStart.heightPercent);
     drawCanvas();
     return;
   }
 
   if (isResizing && boxAtDragStart) {
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const dx = (mx - dragStart.x) / cw;
+    const dy = (my - dragStart.y) / ch;
     const region = blurRegions[selectedBoxIndex];
-    const dx = Math.round((mx - dragStart.x) * scaleX);
-    const dy = Math.round((my - dragStart.y) * scaleY);
-    let { x, y, width, height } = boxAtDragStart;
+    let { xPercent, yPercent, widthPercent, heightPercent } = boxAtDragStart;
 
-    if (resizeHandle.includes('e')) width = Math.max(10, width + dx);
+    if (resizeHandle.includes('e')) widthPercent = Math.max(10 / videoMeta.width, widthPercent + dx);
     if (resizeHandle.includes('w')) {
-      width = Math.max(10, width - dx);
-      x = boxAtDragStart.x + (boxAtDragStart.width - width);
+      widthPercent = Math.max(10 / videoMeta.width, widthPercent - dx);
+      xPercent = boxAtDragStart.xPercent + (boxAtDragStart.widthPercent - widthPercent);
     }
-    if (resizeHandle.includes('s')) height = Math.max(10, height + dy);
+    if (resizeHandle.includes('s')) heightPercent = Math.max(10 / videoMeta.height, heightPercent + dy);
     if (resizeHandle.includes('n')) {
-      height = Math.max(10, height - dy);
-      y = boxAtDragStart.y + (boxAtDragStart.height - height);
+      heightPercent = Math.max(10 / videoMeta.height, heightPercent - dy);
+      yPercent = boxAtDragStart.yPercent + (boxAtDragStart.heightPercent - heightPercent);
     }
 
-    region.x = Math.max(0, x);
-    region.y = Math.max(0, y);
-    region.width = width;
-    region.height = height;
+    region.xPercent = RM.clamp(xPercent, 0, 1 - widthPercent);
+    region.yPercent = RM.clamp(yPercent, 0, 1 - heightPercent);
+    region.widthPercent = widthPercent;
+    region.heightPercent = heightPercent;
     drawCanvas();
   }
 });
@@ -468,18 +576,11 @@ canvas.addEventListener('mouseup', (e) => {
     const y2 = Math.max(drawStart.y, my);
 
     if (x2 - x1 > 5 && y2 - y1 > 5) {
-      const tl = canvasToVideo(x1, y1);
-      const br = canvasToVideo(x2, y2);
-      blurRegions.push({
-        x: tl.x,
-        y: tl.y,
-        width: br.x - tl.x,
-        height: br.y - tl.y,
-        blur_intensity: 20,
-        time_range: { start: 0, end: null },
-      });
+      const newRegion = regionFromCanvasRect(x1, y1, x2 - x1, y2 - y1);
+      blurRegions.push(newRegion);
       selectedBoxIndex = blurRegions.length - 1;
       renderBlurList();
+      markPreviewOutdated();
     }
     isDrawing = false;
     drawCanvas();
@@ -500,9 +601,15 @@ window.addEventListener('mouseup', () => {
 
 // ── Blur list UI ─────────────────────────────────────────────────
 
+function formatPercent(val) {
+  return (val * 100).toFixed(1);
+}
+
 function renderBlurList() {
   blurBoxList.innerHTML = '';
   blurRegions.forEach((region, i) => {
+    const norm = RM.normalizeBlurRegion(region, videoMeta?.width, videoMeta?.height);
+    const px = videoMeta ? RM.blurRegionToPixels(norm, videoMeta.width, videoMeta.height) : null;
     const div = document.createElement('div');
     div.className = `box-item${i === selectedBoxIndex ? ' selected' : ''}`;
     div.dataset.index = i;
@@ -515,16 +622,17 @@ function renderBlurList() {
         <button class="btn btn-danger" data-action="delete" data-index="${i}">Hapus</button>
       </div>
       <div class="box-fields">
-        <label>X <input type="number" data-field="x" data-index="${i}" value="${region.x}" min="0" /></label>
-        <label>Y <input type="number" data-field="y" data-index="${i}" value="${region.y}" min="0" /></label>
-        <label>Lebar <input type="number" data-field="width" data-index="${i}" value="${region.width}" min="10" /></label>
-        <label>Tinggi <input type="number" data-field="height" data-index="${i}" value="${region.height}" min="10" /></label>
+        <label>X% <input type="number" data-field="xPercent" data-index="${i}" value="${formatPercent(norm.xPercent)}" min="0" max="100" step="0.1" /></label>
+        <label>Y% <input type="number" data-field="yPercent" data-index="${i}" value="${formatPercent(norm.yPercent)}" min="0" max="100" step="0.1" /></label>
+        <label>Lebar% <input type="number" data-field="widthPercent" data-index="${i}" value="${formatPercent(norm.widthPercent)}" min="1" max="100" step="0.1" /></label>
+        <label>Tinggi% <input type="number" data-field="heightPercent" data-index="${i}" value="${formatPercent(norm.heightPercent)}" min="1" max="100" step="0.1" /></label>
+        ${px ? `<span class="box-px-hint">≈ ${px.x}, ${px.y} · ${px.width}×${px.height}px</span>` : ''}
         <label class="box-blur-row">
-          Intensitas — <span class="blur-val" data-blur-val="${i}">${region.blur_intensity}</span>
-          <input type="range" class="range" data-field="blur_intensity" data-index="${i}" value="${region.blur_intensity}" min="1" max="50" />
+          Intensitas — <span class="blur-val" data-blur-val="${i}">${norm.blur_intensity}</span>
+          <input type="range" class="range" data-field="blur_intensity" data-index="${i}" value="${norm.blur_intensity}" min="1" max="50" />
         </label>
-        <label>Mulai (s) <input type="number" data-field="time_start" data-index="${i}" value="${region.time_range?.start ?? 0}" min="0" step="0.1" /></label>
-        <label>Selesai (s) <input type="number" data-field="time_end" data-index="${i}" value="${region.time_range?.end ?? ''}" min="0" step="0.1" placeholder="penuh" /></label>
+        <label>Mulai (s) <input type="number" data-field="time_start" data-index="${i}" value="${norm.time_range?.start ?? 0}" min="0" step="0.1" /></label>
+        <label>Selesai (s) <input type="number" data-field="time_end" data-index="${i}" value="${norm.time_range?.end ?? ''}" min="0" step="0.1" placeholder="penuh" /></label>
       </div>
     `;
     blurBoxList.appendChild(div);
@@ -556,6 +664,7 @@ function renderBlurList() {
       else if (selectedBoxIndex > idx) selectedBoxIndex--;
       renderBlurList();
       drawCanvas();
+      markPreviewOutdated();
     });
   });
 
@@ -572,16 +681,22 @@ function onBoxFieldChange(e) {
   if (field === 'time_start') {
     region.time_range = region.time_range || { start: 0, end: null };
     region.time_range.start = parseFloat(e.target.value) || 0;
+    markPreviewOutdated();
   } else if (field === 'time_end') {
     region.time_range = region.time_range || { start: 0, end: null };
     const val = e.target.value.trim();
     region.time_range.end = val === '' ? null : parseFloat(val);
+    markPreviewOutdated();
   } else if (field === 'blur_intensity') {
     region.blur_intensity = parseInt(e.target.value, 10) || 20;
     const valEl = blurBoxList.querySelector(`[data-blur-val="${idx}"]`);
     if (valEl) valEl.textContent = region.blur_intensity;
-  } else {
-    region[field] = parseInt(e.target.value, 10) || 0;
+    markPreviewOutdated();
+  } else if (field.endsWith('Percent')) {
+    region[field] = parseFloat(e.target.value) / 100 || 0;
+    blurRegions[idx] = clampRegionToBounds(region);
+    markPreviewOutdated();
+    renderBlurList();
   }
   drawCanvas();
 }
@@ -604,6 +719,7 @@ function renderSrtList() {
     ta.addEventListener('input', () => {
       const idx = parseInt(ta.dataset.cueIndex, 10);
       cues[idx].text = ta.value;
+      markPreviewOutdated();
     });
   });
 
@@ -618,6 +734,9 @@ function renderSrtList() {
 async function loadVideo(path) {
   videoPath = path;
   setRenderResult('');
+  setPreviewStatus('missing');
+  previewSection.classList.add('hidden');
+  previewPlayer.removeAttribute('src');
   playerWrapper.classList.add('has-video');
   playerStage.classList.remove('hidden');
   transportBar.classList.remove('hidden');
@@ -634,16 +753,18 @@ async function loadVideo(path) {
 
     const name = path.split(/[/\\]/).pop();
     updateVideoMetaPills(name, videoMeta);
+    applyDynamicSubtitleDefaults(videoMeta);
+    normalizeAllBlurRegions();
 
     document.getElementById('audioMode').value = videoMeta.hasAudio ? 'replace' : 'add';
-    btnRender.disabled = false;
     timeDuration.textContent = formatClock(videoMeta.duration);
     seekBar.value = '0';
     timeCurrent.textContent = '00:00';
+    updateRenderButtons();
   } catch (err) {
     updateVideoMetaPills(null, null);
     videoInfo.innerHTML = `<span class="meta-pill warn">Error: ${err}</span>`;
-    btnRender.disabled = true;
+    updateRenderButtons();
     return;
   }
 
@@ -680,7 +801,7 @@ function isTypingInField() {
   const el = document.activeElement;
   if (!el) return false;
   if (el.matches('textarea, select')) return true;
-  if (el.matches('input') && !el.matches('[type="range"]')) return true;
+  if (el.matches('input') && !el.matches('[type="range"], [type="checkbox"]')) return true;
   return false;
 }
 
@@ -708,6 +829,11 @@ document.addEventListener('keydown', (e) => {
 });
 
 btnEditMode?.addEventListener('click', () => setEditMode(!editMode));
+
+toggleShowBlur?.addEventListener('change', (e) => {
+  showBlurOverlay = e.target.checked;
+  drawCanvas();
+});
 
 seekBar?.addEventListener('input', () => {
   isSeeking = true;
@@ -768,6 +894,7 @@ document.getElementById('btnOpenSrt').addEventListener('click', async () => {
   if (!result) return;
   cues = await window.api.parseSrt(result.content);
   renderSrtList();
+  markPreviewOutdated();
 });
 
 document.getElementById('btnOpenAudio').addEventListener('click', async () => {
@@ -791,6 +918,7 @@ document.getElementById('btnAddBox').addEventListener('click', () => {
   selectedBoxIndex = blurRegions.length - 1;
   renderBlurList();
   drawCanvas();
+  markPreviewOutdated();
 });
 
 document.getElementById('btnSavePreset').addEventListener('click', async () => {
@@ -808,12 +936,18 @@ document.getElementById('btnLoadPreset').addEventListener('click', async () => {
   const data = await window.api.loadPreset();
   if (!data) return;
 
-  blurRegions = data.blur_regions || [];
+  blurRegions = (data.blur_regions || []).map((r) =>
+    RM.normalizeBlurRegion(r, videoMeta?.width, videoMeta?.height)
+  );
   selectedBoxIndex = -1;
 
   const style = data.subtitle_style || {};
   if (style.position) document.getElementById('subPosition').value = style.position;
-  if (style.custom_y != null) document.getElementById('subCustomY').value = style.custom_y;
+  if (style.custom_y_percent != null) {
+    document.getElementById('subCustomY').value = (style.custom_y_percent * 100).toFixed(1);
+  } else if (style.custom_y != null && videoMeta) {
+    document.getElementById('subCustomY').value = ((style.custom_y / videoMeta.height) * 100).toFixed(1);
+  }
   if (style.font_size) document.getElementById('subFontSize').value = style.font_size;
   if (style.text_color) document.getElementById('subTextColor').value = style.text_color;
   if (style.box_color) document.getElementById('subBoxColor').value = style.box_color;
@@ -838,17 +972,29 @@ document.getElementById('btnLoadPreset').addEventListener('click', async () => {
 
   renderBlurList();
   drawCanvas();
+  markPreviewOutdated();
   setRenderResult('Preset berhasil dimuat', 'success');
 });
 
 // ── Style panel listeners ────────────────────────────────────────
 
+function bindStyleChange(el, eventName = 'change') {
+  el.addEventListener(eventName, () => markPreviewOutdated());
+}
+
 document.getElementById('subPosition').addEventListener('change', (e) => {
   document.getElementById('customYRow').classList.toggle('hidden', e.target.value !== 'custom');
+  markPreviewOutdated();
 });
+
+[
+  'subFontSize', 'subCustomY', 'subTextColor', 'subBoxColor',
+  'subOutlineWidth', 'subMarginBottom', 'subMaxWidth',
+].forEach((id) => bindStyleChange(document.getElementById(id)));
 
 document.getElementById('subBoxOpacity').addEventListener('input', (e) => {
   document.getElementById('subBoxOpacityVal').textContent = `${e.target.value}%`;
+  markPreviewOutdated();
 });
 
 document.getElementById('audioVolume').addEventListener('input', (e) => {
@@ -857,18 +1003,76 @@ document.getElementById('audioVolume').addEventListener('input', (e) => {
 
 document.getElementById('subTextColor').addEventListener('input', (e) => {
   document.getElementById('subTextColorVal').textContent = e.target.value;
+  markPreviewOutdated();
 });
 
 document.getElementById('subBoxColor').addEventListener('input', (e) => {
   document.getElementById('subBoxColorVal').textContent = e.target.value;
+  markPreviewOutdated();
 });
 
-// ── Render ───────────────────────────────────────────────────────
+// ── Render & Preview ─────────────────────────────────────────────
 
 let removeProgressListener = null;
 
-document.getElementById('btnRender').addEventListener('click', async () => {
-  if (!videoPath) return;
+function setupProgressListener(mode) {
+  if (removeProgressListener) removeProgressListener();
+  removeProgressListener = window.api.onRenderProgress((data) => {
+    if (data.mode && data.mode !== mode) return;
+    const pct = data.percent || 0;
+    progressFill.style.width = `${pct}%`;
+    progressText.textContent = `${pct}%`;
+  });
+}
+
+btnPreview?.addEventListener('click', async () => {
+  if (!videoPath || !videoMeta) return;
+
+  setPreviewStatus('rendering');
+  progressWrap.classList.remove('hidden');
+  progressFill.style.width = '0%';
+  progressText.textContent = '0%';
+  setRenderResult('Membuat preview...', 'info');
+
+  const previewRange = RM.computePreviewRange(
+    video.currentTime,
+    cues,
+    videoMeta.duration
+  );
+
+  const payload = {
+    ...buildRenderPayload(),
+    previewRange,
+  };
+
+  setupProgressListener('preview');
+
+  try {
+    const result = await window.api.startPreviewRender(payload);
+    progressFill.style.width = '100%';
+    progressText.textContent = '100%';
+
+    previewPlayer.src = result.previewSrc;
+    previewSection.classList.remove('hidden');
+    previewPlayer.load();
+    previewPlayer.play().catch(() => {});
+
+    setPreviewStatus('ready');
+    setRenderResult(`Preview siap (${previewRange.duration.toFixed(1)}s dari ${formatClock(previewRange.start)})`, 'success');
+    document.querySelector('.tab[data-tab="export"]')?.click();
+  } catch (err) {
+    setPreviewStatus('missing');
+    setRenderResult(`Preview error: ${err}`, 'error');
+  } finally {
+    if (removeProgressListener) {
+      removeProgressListener();
+      removeProgressListener = null;
+    }
+  }
+});
+
+btnRender.addEventListener('click', async () => {
+  if (!videoPath || previewStatus !== 'ready') return;
 
   btnRender.disabled = true;
   progressWrap.classList.remove('hidden');
@@ -876,23 +1080,9 @@ document.getElementById('btnRender').addEventListener('click', async () => {
   progressText.textContent = '0%';
   setRenderResult('Rendering video...', 'info');
 
-  if (removeProgressListener) removeProgressListener();
-  removeProgressListener = window.api.onRenderProgress((data) => {
-    const pct = data.percent || 0;
-    progressFill.style.width = `${pct}%`;
-    progressText.textContent = `${pct}%`;
-  });
+  setupProgressListener('full');
 
-  const payload = {
-    videoPath,
-    outputFolder: outputFolder || null,
-    blurRegions,
-    cues,
-    subtitleStyle: getSubtitleStyle(),
-    videoMeta,
-    audioFile: audioFile || null,
-    audioSettings: audioFile ? getAudioSettings() : null,
-  };
+  const payload = buildRenderPayload();
 
   try {
     const result = await window.api.startRender(payload);
@@ -903,7 +1093,7 @@ document.getElementById('btnRender').addEventListener('click', async () => {
   } catch (err) {
     setRenderResult(`Error: ${err}`, 'error');
   } finally {
-    btnRender.disabled = false;
+    updateRenderButtons();
     if (removeProgressListener) {
       removeProgressListener();
       removeProgressListener = null;
@@ -923,3 +1113,9 @@ initTabs();
 updateBlurBadge();
 updateEmptyStates();
 updateOutputPath(null);
+updateRenderButtons();
+
+window.api.getAppVersion().then((v) => {
+  const el = document.getElementById('appVersion');
+  if (el && v) el.textContent = `v${v}`;
+}).catch(() => {});
