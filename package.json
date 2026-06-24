@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "start:direct": "node_modules/electron/dist/electron.exe .",
-    "build:win": "electron-builder --win",
+    "build:win": "electron-builder --win --publish never",
     "build:linux": "electron-builder --linux"
   },
   "author": "0xHulk",
